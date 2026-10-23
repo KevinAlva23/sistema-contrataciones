@@ -1,0 +1,133 @@
+/* ============ PALETA (inspirada en Pemex) ============ */
+:root {
+  --verde: #00843d;         /* verde institucional (principal) */
+  --verde-oscuro: #07492a;  /* verde más oscuro (hover, bordes) */
+  --verde-claro: #2e9e5b;   /* botón Contratar */
+  --dorado: #f2a900;        /* acento dorado/amarillo */
+  --rojo: #c8102e;          /* botón Rechazar */
+  --gris: #eef1ee;          /* fondo de la página */
+  --borde: #d5ddd7;        /* líneas y bordes */
+  --texto: #1c2b22;         /* texto */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--gris);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ============ DISTRIBUCIÓN ============ */
+.contenedor {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+/* Título como barra verde con franja dorada abajo */
+h1 {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.25rem;
+  font-size: 1.5rem;
+  color: white;
+  background: var(--verde);
+  border-bottom: 5px solid var(--dorado);   /* franja dorada */
+  border-radius: 10px 10px 0 0;
+  letter-spacing: 0.5px;
+}
+
+.tarjeta {
+  background: white;
+  border: 1px solid var(--borde);
+  border-top: 3px solid var(--verde);       /* línea verde arriba de cada tarjeta */
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ============ FORMULARIO ============ */
+.formulario { display: flex; flex-wrap: wrap; gap: 8px; }
+
+input {
+  flex: 1 1 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+input:focus {
+  outline: 2px solid var(--dorado);   /* foco dorado */
+  border-color: transparent;
+}
+
+/* ============ BOTONES ============ */
+button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--verde);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover { background: var(--verde-oscuro); }
+button.verde { background: var(--verde-claro); }
+button.verde:hover { background: var(--verde); }
+button.rojo { background: var(--rojo); }
+button.rojo:hover { background: #9d0c24; }
+
+/* ============ FILTRO ============ */
+.filtro {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--verde-oscuro);
+}
+select {
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: white;
+}
+
+/* ============ TABLA ============ */
+.tabla-scroll { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; background: white; }
+
+th, td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--borde);
+}
+
+/* Encabezado verde con texto blanco */
+th {
+  background: var(--verde);
+  color: white;
+  font-size: 0.85rem;
+}
+
+/* Filas alternas y resaltado al pasar el mouse */
+tbody tr:nth-child(even) { background: #f6f9f7; }
+tbody tr:hover { background: #fff6dc; }
+
+.acciones { display: flex; gap: 6px; }
+
+/* ============ ETIQUETA DE ESTADO ============ */
+.estado {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--borde);
+}
+.estado.contratado { background: #d8f0e1; color: #07492a; }
+.estado.rechazado  { background: #fbdde2; color: #8a0b20; }
+.estado.pendiente  { background: #fff0c2; color: #7a5200; }
