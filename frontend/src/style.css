@@ -135,3 +135,7 @@ tbody tr:hover { background: #fff6dc; }
 /* Botón gris para Editar y Cancelar */
 button.gris { background: #6b7280; }
 button.gris:hover { background: #4b5563; }
+
+/* Cuadro de búsqueda: ocupa el espacio sobrante de la barra de filtros */
+.buscador { flex: 1 1 220px; }
+.filtro { flex-wrap: wrap; }
