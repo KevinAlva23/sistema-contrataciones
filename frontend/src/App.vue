@@ -7,6 +7,7 @@ const filtro = ref('todos')
 const busqueda = ref('')
 const form = ref({ nombre: '', email: '', puesto: '', telefono: '' })
 const editandoId = ref(null)
+const error = ref('')
 
 // Lista mostrada: primero filtra por estado, luego por el texto buscado
 const filtrados = computed(() => {
@@ -30,11 +31,17 @@ async function cargar() {
 async function guardar() {
   const editando = editandoId.value !== null
   const url = editando ? `/api/candidatos/${editandoId.value}` : '/api/candidatos'
-  await fetch(url, {
+  const r = await fetch(url, {
     method: editando ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(form.value)
   })
+  if (!r.ok) {
+    const d = await r.json()
+    error.value = typeof d.detail === 'string' ? d.detail : 'Datos inválidos'
+    return
+  }
+  error.value = ''
   cancelar()
   cargar()
 }
@@ -82,6 +89,7 @@ onMounted(cargar)
       <button>{{ editandoId !== null ? 'Guardar cambios' : 'Agregar' }}</button>
       <button v-if="editandoId !== null" type="button" class="gris" @click="cancelar">Cancelar</button>
     </form>
+    <p v-if="error" class="error">{{ error }}</p>
 
     <div class="filtro">
       <input v-model="busqueda" class="buscador" placeholder="Buscar por nombre, email o puesto" />
