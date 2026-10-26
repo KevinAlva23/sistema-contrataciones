@@ -26,6 +26,10 @@ Abrir http://localhost:8080
 
 ## Historial de cambios
 
+### v1.4 - Búsqueda y confirmación
+- Buscador por nombre, email o puesto
+- Confirmación antes de eliminar un candidato
+
 ### v1.3 - Contenedores por separado
 - Backend y frontend ejecutables con `podman run`, sin compose
 - Red `red-contrataciones` y volumen `datos` creados a mano
