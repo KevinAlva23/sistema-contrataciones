@@ -131,3 +131,7 @@ tbody tr:hover { background: #fff6dc; }
 .estado.contratado { background: #d8f0e1; color: #07492a; }
 .estado.rechazado  { background: #fbdde2; color: #8a0b20; }
 .estado.pendiente  { background: #fff0c2; color: #7a5200; }
+
+/* Botón gris para Editar y Cancelar */
+button.gris { background: #6b7280; }
+button.gris:hover { background: #4b5563; }

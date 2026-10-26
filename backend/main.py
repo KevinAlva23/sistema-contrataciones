@@ -50,3 +50,20 @@ def borrar(id: int):
         s.delete(c)
         s.commit()
         return {"ok": True}
+
+# Reemplaza los datos de un candidato (nombre, email, puesto, teléfono).
+# El estado no se toca: se cambia con los botones Contratar/Rechazar.
+@app.put("/candidatos/{id}")
+def editar(id: int, datos: Candidato):
+    with Session(engine) as s:
+        c = s.get(Candidato, id)
+        if not c:
+            raise HTTPException(404, "No encontrado")
+        c.nombre = datos.nombre
+        c.email = datos.email
+        c.puesto = datos.puesto
+        c.telefono = datos.telefono
+        s.add(c)
+        s.commit()
+        s.refresh(c)
+        return c
