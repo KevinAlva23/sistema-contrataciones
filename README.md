@@ -23,3 +23,19 @@ Abrir http://localhost:8080
 - Cambiar estado: pendiente, contratado, rechazado
 - Eliminar candidatos
 - Filtro por estado
+
+## Historial de cambios
+
+### v1.2 - Edición de candidatos
+- Botón **Editar** que carga los datos en el formulario
+- Nueva ruta `PUT /candidatos/{id}` en el backend
+- Botón **Cancelar** para salir del modo edición
+
+### v1.1 - Filtro y diseño
+- Filtro por estado con contador de resultados
+- Diseño en verde y dorado
+- Teléfono obligatorio de 10 dígitos
+
+### v1.0 - Primera versión
+- Alta, cambio de estado y eliminación de candidatos
+- Backend FastAPI + frontend Vue en contenedores Podman
