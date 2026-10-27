@@ -1,13 +1,14 @@
-/* ============ PALETA (inspirada en Pemex) ============ */
+/* ============ PALETA ============ */
 :root {
-  --verde: #00843d;         /* verde institucional (principal) */
-  --verde-oscuro: #07492a;  /* verde más oscuro (hover, bordes) */
-  --verde-claro: #2e9e5b;   /* botón Contratar */
-  --dorado: #f2a900;        /* acento dorado/amarillo */
-  --rojo: #c8102e;          /* botón Rechazar */
-  --gris: #eef1ee;          /* fondo de la página */
-  --borde: #d5ddd7;        /* líneas y bordes */
-  --texto: #1c2b22;         /* texto */
+  --verde: #00843d;
+  --verde-oscuro: #075a2d;
+  --verde-claro: #e6f4ec;
+  --dorado: #f2a900;
+  --rojo: #c8102e;
+  --gris: #f1f4f2;
+  --borde: #d9e0db;
+  --texto: #1c2b22;
+  --suave: #5f6f66;
 }
 
 * { box-sizing: border-box; }
@@ -19,125 +20,200 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* ============ DISTRIBUCIÓN ============ */
-.contenedor {
-  max-width: 1000px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-}
-
-/* Título como barra verde con franja dorada abajo */
-h1 {
-  margin: 0 0 1.5rem;
-  padding: 1rem 1.25rem;
-  font-size: 1.5rem;
+/* ============ BARRA SUPERIOR ============ */
+.topbar {
+  background: linear-gradient(90deg, var(--verde-oscuro), var(--verde));
+  border-bottom: 4px solid var(--dorado);
   color: white;
-  background: var(--verde);
-  border-bottom: 5px solid var(--dorado);   /* franja dorada */
-  border-radius: 10px 10px 0 0;
-  letter-spacing: 0.5px;
 }
+.topbar-in {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 0.9rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.marca { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.4px; }
+.marca small { display: block; font-size: 0.75rem; font-weight: 400; opacity: 0.85; }
+.sesion { display: flex; align-items: center; gap: 10px; }
+.usuario { font-weight: 600; }
 
-.tarjeta {
+/* Etiqueta de rol */
+.rol {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: white;
+}
+.rol.admin { color: var(--rojo); }
+.rol.reclutador { color: var(--verde); }
+.rol.auditor { color: #8a5a00; background: #ffe9b0; }
+
+/* ============ CONTENEDOR ============ */
+.contenedor { max-width: 1150px; margin: 1.5rem auto; padding: 0 1rem; }
+
+/* ============ LOGIN ============ */
+.login-wrap { display: flex; justify-content: center; padding-top: 4rem; }
+.login {
+  width: 100%;
+  max-width: 380px;
   background: white;
   border: 1px solid var(--borde);
-  border-top: 3px solid var(--verde);       /* línea verde arriba de cada tarjeta */
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
+  border-top: 5px solid var(--verde);
+  border-radius: 12px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
+.login h2 { margin: 0 0 4px; color: var(--verde-oscuro); }
+.login p.sub { margin: 0 0 8px; color: var(--suave); font-size: 0.9rem; }
+
+/* ============ TARJETAS DE RESUMEN ============ */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 1.25rem;
+}
+.stat {
+  background: white;
+  border: 1px solid var(--borde);
+  border-left: 6px solid var(--verde);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+.stat .num { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+.stat .lbl { color: var(--suave); font-size: 0.85rem; margin-top: 4px; }
+.stat.pend { border-left-color: var(--dorado); }
+.stat.cont { border-left-color: var(--verde); }
+.stat.rech { border-left-color: var(--rojo); }
+
+/* ============ PANELES ============ */
+.panel {
+  background: white;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.panel-titulo {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+  font-size: 1rem;
+  border-bottom: 1px solid var(--borde);
+}
+.panel-cuerpo { padding: 1rem; }
 
 /* ============ FORMULARIO ============ */
-.formulario { display: flex; flex-wrap: wrap; gap: 8px; }
-
-input {
-  flex: 1 1 150px;
-  padding: 8px 10px;
-  border: 1px solid var(--borde);
-  border-radius: 6px;
-  font-size: 0.95rem;
+.grid-form {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
+.acciones-form { display: flex; gap: 8px; margin-top: 10px; }
 
-input:focus {
-  outline: 2px solid var(--dorado);   /* foco dorado */
+input, select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+}
+input:focus, select:focus {
+  outline: 2px solid var(--dorado);
   border-color: transparent;
 }
 
 /* ============ BOTONES ============ */
 button {
-  padding: 8px 12px;
+  padding: 9px 14px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--verde);
   color: white;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s;
 }
 button:hover { background: var(--verde-oscuro); }
-button.verde { background: var(--verde-claro); }
+button.verde { background: #2e9e5b; }
 button.verde:hover { background: var(--verde); }
 button.rojo { background: var(--rojo); }
 button.rojo:hover { background: #9d0c24; }
+button.gris { background: #6b7280; }
+button.gris:hover { background: #4b5563; }
+button.borde { background: transparent; border: 1px solid white; }
+button.borde:hover { background: rgba(255, 255, 255, 0.15); }
 
-/* ============ FILTRO ============ */
-.filtro {
-  margin-bottom: 1rem;
+/* ============ BARRA DE FILTROS ============ */
+.toolbar {
   display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: var(--verde-oscuro);
+  flex-wrap: wrap;
+  padding: 0.9rem 1rem;
 }
-select {
-  padding: 8px 10px;
-  border: 1px solid var(--borde);
-  border-radius: 6px;
-  background: white;
-}
+.toolbar .buscador { flex: 1 1 260px; }
+.toolbar select { width: auto; }
+.cuenta { color: var(--suave); font-size: 0.9rem; margin-left: auto; }
 
 /* ============ TABLA ============ */
 .tabla-scroll { overflow-x: auto; }
-
-table { width: 100%; border-collapse: collapse; background: white; }
-
-th, td {
-  padding: 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--borde);
-}
-
-/* Encabezado verde con texto blanco */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--borde); }
 th {
   background: var(--verde);
   color: white;
-  font-size: 0.85rem;
-}
-
-/* Filas alternas y resaltado al pasar el mouse */
-tbody tr:nth-child(even) { background: #f6f9f7; }
-tbody tr:hover { background: #fff6dc; }
-
-.acciones { display: flex; gap: 6px; }
-
-/* ============ ETIQUETA DE ESTADO ============ */
-.estado {
-  padding: 2px 10px;
-  border-radius: 999px;
   font-size: 0.8rem;
-  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+tbody tr:nth-child(even) { background: #f7faf8; }
+tbody tr:hover { background: #fff6dc; }
+.acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.vacio { text-align: center; color: var(--suave); padding: 1.5rem; }
+
+/* ============ ESTADOS ============ */
+.estado {
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
   background: var(--borde);
 }
 .estado.contratado { background: #d8f0e1; color: #07492a; }
-.estado.rechazado  { background: #fbdde2; color: #8a0b20; }
-.estado.pendiente  { background: #fff0c2; color: #7a5200; }
+.estado.rechazado { background: #fbdde2; color: #8a0b20; }
+.estado.pendiente { background: #fff0c2; color: #7a5200; }
 
-/* Botón gris para Editar y Cancelar */
-button.gris { background: #6b7280; }
-button.gris:hover { background: #4b5563; }
+/* ============ ERRORES Y PIE ============ */
+.error {
+  color: var(--rojo);
+  font-weight: 600;
+  margin: 8px 0 0;
+}
+.pie {
+  text-align: center;
+  color: var(--suave);
+  font-size: 0.85rem;
+  padding: 1rem 0 2rem;
+}
 
-/* Cuadro de búsqueda: ocupa el espacio sobrante de la barra de filtros */
-.buscador { flex: 1 1 220px; }
-.filtro { flex-wrap: wrap; }
-
-.error { color: #c8102e; font-weight: 600; margin: -0.5rem 0 1rem; }
+/* ============ CELULAR ============ */
+@media (max-width: 800px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .grid-form { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .grid-form { grid-template-columns: 1fr; }
+}
