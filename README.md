@@ -26,6 +26,11 @@ Abrir http://localhost:8080
 
 ## Historial de cambios
 
+### v1.5 - Validaciones en el backend
+- Teléfono de 10 dígitos validado en la API
+- Email único por candidato
+- Mensajes de error visibles en pantalla
+
 ### v1.4 - Búsqueda y confirmación
 - Buscador por nombre, email o puesto
 - Confirmación antes de eliminar un candidato
