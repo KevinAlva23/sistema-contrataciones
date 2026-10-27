@@ -26,6 +26,10 @@ Abrir http://localhost:8080
 
 ## Historial de cambios
 
+### v1.6 - Script de inicio
+- `iniciar.sh` construye y levanta todo con un comando
+- Espera a que el backend esté listo antes de abrir el frontend
+
 ### v1.5 - Validaciones en el backend
 - Teléfono de 10 dígitos validado en la API
 - Email único por candidato
