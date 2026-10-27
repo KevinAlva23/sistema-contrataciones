@@ -1,6 +1,19 @@
+import os
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+
+import bcrypt
+import jwt
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import SQLModel, Field, Session, create_engine, select
+
+# Clave para firmar los tokens. Si no se define, se genera una al azar
+# (las sesiones se cierran al reiniciar el backend).
+SECRET = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+ROLES = ("admin", "reclutador", "consulta")
+
 
 class Candidato(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -10,28 +23,162 @@ class Candidato(SQLModel, table=True):
     telefono: str
     estado: str = "pendiente"
 
+
+class Usuario(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, index=True)
+    password_hash: str
+    rol: str = "consulta"
+    activo: bool = True
+
+
+class Login(SQLModel):
+    username: str
+    password: str
+
+
+class NuevoUsuario(SQLModel):
+    username: str
+    password: str
+    rol: str
+
+
 engine = create_engine("sqlite:////data/contrataciones.db")
 SQLModel.metadata.create_all(engine)
 
 
+def hashear(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verificar(password: str, hash_guardado: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hash_guardado.encode())
+
+
+# Crea el primer administrador si todavía no existe ningún usuario
+with Session(engine) as s:
+    if not s.exec(select(Usuario)).first():
+        clave = os.environ.get("ADMIN_PASSWORD")
+        if clave:
+            s.add(Usuario(
+                username=os.environ.get("ADMIN_USER", "admin"),
+                password_hash=hashear(clave),
+                rol="admin",
+            ))
+            s.commit()
+        else:
+            print("AVISO: no hay usuarios y falta ADMIN_PASSWORD en el entorno")
+
+
+app = FastAPI(title="Sistema de Contrataciones", root_path="/api")
+bearer = HTTPBearer(auto_error=False)
+
+
+def usuario_actual(cred: HTTPAuthorizationCredentials = Depends(bearer)):
+    if not cred:
+        raise HTTPException(401, "No autenticado")
+    try:
+        datos = jwt.decode(cred.credentials, SECRET, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        raise HTTPException(401, "Sesión inválida o expirada")
+    with Session(engine) as s:
+        u = s.get(Usuario, int(datos["sub"]))
+        if not u or not u.activo:
+            raise HTTPException(401, "Usuario no válido")
+        return u
+
+
+def requiere(*roles):
+    def comprobar(u: Usuario = Depends(usuario_actual)):
+        if u.rol not in roles:
+            raise HTTPException(403, "No tienes permiso para esta acción")
+        return u
+    return comprobar
+
+
 def validar(c, s, id_actual=None):
-    # Teléfono: exactamente 10 dígitos
     if not (c.telefono.isdigit() and len(c.telefono) == 10):
         raise HTTPException(422, "El teléfono debe tener 10 dígitos")
-    # Email: no puede repetirse en otro candidato
     existente = s.exec(select(Candidato).where(Candidato.email == c.email)).first()
     if existente and existente.id != id_actual:
         raise HTTPException(409, "Ese email ya está registrado")
 
-app = FastAPI(title="Sistema de Contrataciones", root_path="/api")
 
+# ---------- Sesión ----------
+@app.post("/login")
+def login(datos: Login):
+    with Session(engine) as s:
+        u = s.exec(select(Usuario).where(Usuario.username == datos.username)).first()
+        if not u or not u.activo or not verificar(datos.password, u.password_hash):
+            raise HTTPException(401, "Usuario o contraseña incorrectos")
+        token = jwt.encode(
+            {
+                "sub": str(u.id),
+                "exp": datetime.now(timezone.utc) + timedelta(hours=8),
+            },
+            SECRET,
+            algorithm="HS256",
+        )
+        return {"token": token, "username": u.username, "rol": u.rol}
+
+
+@app.get("/yo")
+def yo(u: Usuario = Depends(usuario_actual)):
+    return {"username": u.username, "rol": u.rol}
+
+
+# ---------- Usuarios (solo admin) ----------
+@app.get("/usuarios")
+def listar_usuarios(_: Usuario = Depends(requiere("admin"))):
+    with Session(engine) as s:
+        return [
+            {"id": u.id, "username": u.username, "rol": u.rol, "activo": u.activo}
+            for u in s.exec(select(Usuario)).all()
+        ]
+
+
+@app.post("/usuarios")
+def crear_usuario(datos: NuevoUsuario, _: Usuario = Depends(requiere("admin"))):
+    if datos.rol not in ROLES:
+        raise HTTPException(422, "Rol inválido")
+    if len(datos.password) < 8:
+        raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres")
+    with Session(engine) as s:
+        if s.exec(select(Usuario).where(Usuario.username == datos.username)).first():
+            raise HTTPException(409, "Ese usuario ya existe")
+        u = Usuario(
+            username=datos.username,
+            password_hash=hashear(datos.password),
+            rol=datos.rol,
+        )
+        s.add(u)
+        s.commit()
+        s.refresh(u)
+        return {"id": u.id, "username": u.username, "rol": u.rol}
+
+
+@app.delete("/usuarios/{id}")
+def borrar_usuario(id: int, yo: Usuario = Depends(requiere("admin"))):
+    if id == yo.id:
+        raise HTTPException(400, "No puedes eliminar tu propia cuenta")
+    with Session(engine) as s:
+        u = s.get(Usuario, id)
+        if not u:
+            raise HTTPException(404, "No encontrado")
+        s.delete(u)
+        s.commit()
+        return {"ok": True}
+
+
+# ---------- Candidatos ----------
 @app.get("/candidatos")
-def listar():
+def listar(_: Usuario = Depends(requiere("admin", "reclutador", "consulta"))):
     with Session(engine) as s:
         return s.exec(select(Candidato)).all()
 
+
 @app.post("/candidatos")
-def crear(c: Candidato):
+def crear(c: Candidato, _: Usuario = Depends(requiere("admin", "reclutador"))):
     with Session(engine) as s:
         validar(c, s)
         s.add(c)
@@ -39,8 +186,11 @@ def crear(c: Candidato):
         s.refresh(c)
         return c
 
+
 @app.patch("/candidatos/{id}")
-def cambiar_estado(id: int, estado: str):
+def cambiar_estado(
+    id: int, estado: str, _: Usuario = Depends(requiere("admin", "reclutador"))
+):
     if estado not in ("pendiente", "contratado", "rechazado"):
         raise HTTPException(400, "Estado inválido")
     with Session(engine) as s:
@@ -52,20 +202,11 @@ def cambiar_estado(id: int, estado: str):
         s.commit()
         return c
 
-@app.delete("/candidatos/{id}")
-def borrar(id: int):
-    with Session(engine) as s:
-        c = s.get(Candidato, id)
-        if not c:
-            raise HTTPException(404, "No encontrado")
-        s.delete(c)
-        s.commit()
-        return {"ok": True}
 
-# Reemplaza los datos de un candidato (nombre, email, puesto, teléfono).
-# El estado no se toca: se cambia con los botones Contratar/Rechazar.
 @app.put("/candidatos/{id}")
-def editar(id: int, datos: Candidato):
+def editar(
+    id: int, datos: Candidato, _: Usuario = Depends(requiere("admin", "reclutador"))
+):
     with Session(engine) as s:
         c = s.get(Candidato, id)
         if not c:
@@ -79,3 +220,14 @@ def editar(id: int, datos: Candidato):
         s.commit()
         s.refresh(c)
         return c
+
+
+@app.delete("/candidatos/{id}")
+def borrar(id: int, _: Usuario = Depends(requiere("admin"))):
+    with Session(engine) as s:
+        c = s.get(Candidato, id)
+        if not c:
+            raise HTTPException(404, "No encontrado")
+        s.delete(c)
+        s.commit()
+        return {"ok": True}

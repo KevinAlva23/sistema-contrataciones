@@ -27,7 +27,7 @@ echo "3/5 Limpiando contenedores anteriores..."
 podman rm -f frontend backend 2>/dev/null || true
 
 echo "4/5 Levantando backend..."
-podman run -d --name backend --network $RED -v $VOLUMEN:/data localhost/contrataciones_backend
+podman run -d --name backend --env-file .env --network $RED -v $VOLUMEN:/data localhost/contrataciones_backend
 
 # Espera hasta 15 segundos a que el backend arranque
 for i in $(seq 1 15); do
