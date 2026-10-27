@@ -103,6 +103,12 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ## Historial de cambios
 
+### v1.8 - Rediseño
+- Barra superior con usuario y rol
+- Tarjetas de resumen por estado
+- Formulario, filtros y tabla en paneles
+- Diseño adaptable a celular
+
 ### v1.7 - Usuarios y roles
 - Login con contraseñas cifradas (bcrypt) y sesión JWT de 8 horas
 - Roles: admin, reclutador y auditor (solo lectura)
