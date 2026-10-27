@@ -1,28 +1,74 @@
 # Sistema de Contrataciones
 
-Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado).
+Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado), ejecutada en contenedores con Podman.
 
 ## Tecnologías
 - Frontend: Vue 3 + Vite, servido con Nginx
 - Backend: FastAPI (Python) + SQLModel
 - Base de datos: SQLite (volumen persistente)
-- Contenedores: Podman / Docker Compose
+- Contenedores: Podman (también compatible con Docker)
 
-## Ejecutar
-    podman compose up -d --build
+## Requisitos
+- Podman instalado
+- Git
+
+## Ejecutar (recomendado)
+
+    git clone https://github.com/KevinAlva23/sistema-contrataciones.git
+    cd sistema-contrataciones
+    chmod +x iniciar.sh
+    ./iniciar.sh
 
 Abrir http://localhost:8080
 
+El script construye las imágenes, crea la red y el volumen si no existen, levanta el backend, espera a que esté listo y después levanta el frontend.
+
+Para apagar todo (los datos se conservan en el volumen):
+
+    ./iniciar.sh detener
+
+## Ejecutar con compose (alternativa)
+
+    podman compose up -d --build
+
+No uses compose y el script al mismo tiempo: ambos usan el puerto 8080 y nombres de contenedor que chocan. Para cambiar de método, apaga primero el anterior.
+
 ## Estructura
-- `backend/`: API (main.py, requirements.txt, Dockerfile)
-- `frontend/`: interfaz Vue (src/, nginx.conf, Dockerfile)
-- `docker-compose.yml`: orquesta ambos contenedores
+- `iniciar.sh`: construye y levanta todo con un comando
+- `docker-compose.yml`: alternativa con compose
+- `backend/`: API (`main.py`, `requirements.txt`, `Dockerfile`)
+- `frontend/`: interfaz Vue (`src/`, `nginx.conf`, `Dockerfile`)
+
+## Arquitectura
+- El navegador entra por el puerto 8080 al contenedor `frontend` (Nginx).
+- Nginx sirve la interfaz y reenvía `/api` al contenedor `backend` (FastAPI).
+- Los dos contenedores comparten la red `red-contrataciones` y se encuentran por nombre.
+- La base de datos SQLite vive en el volumen `datos`, así sobrevive aunque se borren los contenedores.
+- Solo el frontend publica un puerto; el backend no es accesible desde fuera.
 
 ## Funciones
-- Alta de candidatos con validación
+- Alta de candidatos con validación (frontend y backend)
+- Edición de candidatos
 - Cambiar estado: pendiente, contratado, rechazado
-- Eliminar candidatos
+- Eliminar candidatos con confirmación
+- Búsqueda por nombre, email o puesto
 - Filtro por estado
+- Email único y teléfono de 10 dígitos
+
+## API
+Documentación interactiva en http://localhost:8080/api/docs
+
+- `GET /candidatos`: lista
+- `POST /candidatos`: crea
+- `PUT /candidatos/{id}`: edita datos
+- `PATCH /candidatos/{id}?estado=...`: cambia el estado
+- `DELETE /candidatos/{id}`: elimina
+
+## Comandos útiles
+
+    podman ps                  # ver contenedores
+    podman logs -f backend     # logs del backend
+    podman logs -f frontend    # logs del frontend
 
 ## Historial de cambios
 
@@ -41,13 +87,12 @@ Abrir http://localhost:8080
 
 ### v1.3 - Contenedores por separado
 - Backend y frontend ejecutables con `podman run`, sin compose
-- Red `red-contrataciones` y volumen `datos` creados a mano
-- Nueva sección "Ejecutar sin compose"
+- Red `red-contrataciones` y volumen `datos`
 
 ### v1.2 - Edición de candidatos
-- Botón **Editar** que carga los datos en el formulario
-- Nueva ruta `PUT /candidatos/{id}` en el backend
-- Botón **Cancelar** para salir del modo edición
+- Botón Editar que carga los datos en el formulario
+- Ruta `PUT /candidatos/{id}` en el backend
+- Botón Cancelar para salir del modo edición
 
 ### v1.1 - Filtro y diseño
 - Filtro por estado con contador de resultados
@@ -56,28 +101,4 @@ Abrir http://localhost:8080
 
 ### v1.0 - Primera versión
 - Alta, cambio de estado y eliminación de candidatos
-- Backend FastAPI + frontend Vue en contenedores Podman
-
-## Ejecutar sin compose (contenedores por separado)
-
-1. Construir las imágenes:
-
-        podman build -t contrataciones_backend ./backend
-        podman build -t contrataciones_frontend ./frontend
-
-2. Crear la red y el volumen (la red permite que los contenedores se encuentren por nombre; el volumen guarda la base de datos):
-
-        podman network create red-contrataciones
-        podman volume create datos
-
-3. Levantar el backend primero (sin puerto publicado):
-
-        podman run -d --name backend --network red-contrataciones -v datos:/data localhost/contrataciones_backend
-
-4. Levantar el frontend (publica el puerto 8080):
-
-        podman run -d --name frontend --network red-contrataciones -p 8080:80 localhost/contrataciones_frontend
-
-Abrir http://localhost:8080
-
-Para detener: `podman stop frontend backend`. Para iniciar de nuevo: `podman start backend` y luego `podman start frontend`.
+- Backend FastAPI y frontend Vue en contenedores Podman
