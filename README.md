@@ -1,25 +1,39 @@
 # Sistema de Contrataciones
 
-Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado), ejecutada en contenedores con Podman.
+Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado), con inicio de sesión y roles, ejecutada en contenedores con Podman.
 
 ## Tecnologías
 - Frontend: Vue 3 + Vite, servido con Nginx
 - Backend: FastAPI (Python) + SQLModel
 - Base de datos: SQLite (volumen persistente)
+- Seguridad: contraseñas con bcrypt y sesiones JWT
 - Contenedores: Podman (también compatible con Docker)
 
 ## Requisitos
 - Podman instalado
 - Git
 
-## Ejecutar (recomendado)
-	SECRET_KEY=pulsarns200
-	ADMIN_USER=admin
-	ADMIN_PASSWORD=Kev210905
-    	git clone https://github.com/KevinAlva23/sistema-contrataciones.git
-   	cd sistema-contrataciones
-   	 chmod +x iniciar.sh
-    	./iniciar.sh
+## Configuración inicial (archivo .env)
+
+Antes de la primera ejecución, crea un archivo `.env` en la raíz del proyecto. **No se sube a GitHub** (está en `.gitignore`):
+
+    SECRET_KEY=una-frase-larga-y-aleatoria
+    ADMIN_USER=admin
+    ADMIN_PASSWORD=una-clave-segura
+
+- `SECRET_KEY`: firma los tokens de sesión.
+- `ADMIN_USER` y `ADMIN_PASSWORD`: crean el primer administrador al arrancar, solo si la base no tiene usuarios.
+
+Protege el archivo:
+
+    chmod 600 .env
+
+## Ejecutar
+
+    git clone https://github.com/KevinAlva23/sistema-contrataciones.git
+    cd sistema-contrataciones
+    chmod +x iniciar.sh
+    ./iniciar.sh
 
 Abrir http://localhost:8080
 
@@ -29,17 +43,28 @@ Para apagar todo (los datos se conservan en el volumen):
 
     ./iniciar.sh detener
 
-## Ejecutar con compose (alternativa)
+## Roles y permisos
 
-    podman compose up -d --build
+| Rol | Ver | Agregar y editar | Contratar / rechazar | Eliminar | Gestionar usuarios |
+|---|---|---|---|---|---|
+| admin | Sí | Sí | Sí | Sí | Sí |
+| reclutador | Sí | Sí | Sí | No | No |
+| auditor | Sí | No | No | No | No |
 
-No uses compose y el script al mismo tiempo: ambos usan el puerto 8080 y nombres de contenedor que chocan. Para cambiar de método, apaga primero el anterior.
+- Los permisos se validan en el backend; ocultar botones en la pantalla no es la única protección.
+- Las sesiones caducan a las 8 horas.
+- El auditor es de solo lectura: ve la tabla, sin formulario ni acciones.
+
+## Crear usuarios
+
+Con el sistema en marcha, un administrador puede crear cuentas desde http://localhost:8080/api/docs (botón Authorize con el token de `POST /login`, y luego `POST /usuarios`) con el rol `reclutador` o `auditor`. La contraseña debe tener al menos 8 caracteres.
 
 ## Estructura
 - `iniciar.sh`: construye y levanta todo con un comando
-- `docker-compose.yml`: alternativa con compose
+- `docker-compose.yml`: alternativa con compose (no usar a la vez que el script)
 - `backend/`: API (`main.py`, `requirements.txt`, `Dockerfile`)
 - `frontend/`: interfaz Vue (`src/`, `nginx.conf`, `Dockerfile`)
+- `.env`: secretos locales (no se sube a GitHub)
 
 ## Arquitectura
 - El navegador entra por el puerto 8080 al contenedor `frontend` (Nginx).
@@ -49,10 +74,11 @@ No uses compose y el script al mismo tiempo: ambos usan el puerto 8080 y nombres
 - Solo el frontend publica un puerto; el backend no es accesible desde fuera.
 
 ## Funciones
+- Inicio de sesión con roles (admin, reclutador, auditor)
 - Alta de candidatos con validación (frontend y backend)
 - Edición de candidatos
 - Cambiar estado: pendiente, contratado, rechazado
-- Eliminar candidatos con confirmación
+- Eliminar candidatos con confirmación (solo admin)
 - Búsqueda por nombre, email o puesto
 - Filtro por estado
 - Email único y teléfono de 10 dígitos
@@ -60,11 +86,14 @@ No uses compose y el script al mismo tiempo: ambos usan el puerto 8080 y nombres
 ## API
 Documentación interactiva en http://localhost:8080/api/docs
 
-- `GET /candidatos`: lista
-- `POST /candidatos`: crea
-- `PUT /candidatos/{id}`: edita datos
-- `PATCH /candidatos/{id}?estado=...`: cambia el estado
-- `DELETE /candidatos/{id}`: elimina
+- `POST /login`: inicia sesión y devuelve el token
+- `GET /yo`: datos del usuario actual
+- `GET /usuarios`, `POST /usuarios`, `DELETE /usuarios/{id}`: gestión de usuarios (admin)
+- `GET /candidatos`: lista (todos los roles)
+- `POST /candidatos`: crea (admin, reclutador)
+- `PUT /candidatos/{id}`: edita datos (admin, reclutador)
+- `PATCH /candidatos/{id}?estado=...`: cambia el estado (admin, reclutador)
+- `DELETE /candidatos/{id}`: elimina (admin)
 
 ## Comandos útiles
 
@@ -76,9 +105,10 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ### v1.7 - Usuarios y roles
 - Login con contraseñas cifradas (bcrypt) y sesión JWT de 8 horas
-- Roles: admin, reclutador y consulta
+- Roles: admin, reclutador y auditor (solo lectura)
 - Permisos validados en el backend
 - Botones visibles según el rol
+- Configuración de secretos con archivo `.env`
 
 ### v1.6 - Script de inicio
 - `iniciar.sh` construye y levanta todo con un comando
@@ -94,7 +124,7 @@ Documentación interactiva en http://localhost:8080/api/docs
 - Confirmación antes de eliminar un candidato
 
 ### v1.3 - Contenedores por separado
-- Backend y frontend ejecutables con `podman run`, sin compose
+- Backend y frontend en contenedores independientes
 - Red `red-contrataciones` y volumen `datos`
 
 ### v1.2 - Edición de candidatos
