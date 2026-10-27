@@ -17,9 +17,9 @@ Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y e
 
 Antes de la primera ejecución, crea un archivo `.env` en la raíz del proyecto. **No se sube a GitHub** (está en `.gitignore`):
 
-    SECRET_KEY=una-frase-larga-y-aleatoria
+    SECRET_KEY=pulsarns200
     ADMIN_USER=admin
-    ADMIN_PASSWORD=una-clave-segura
+    ADMIN_PASSWORD=Kev210905
 
 - `SECRET_KEY`: firma los tokens de sesión.
 - `ADMIN_USER` y `ADMIN_PASSWORD`: crean el primer administrador al arrancar, solo si la base no tiene usuarios.
