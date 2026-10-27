@@ -33,8 +33,8 @@ def listar():
 @app.post("/candidatos")
 def crear(c: Candidato):
     with Session(engine) as s:
-validar(c, s)
-s.add(c)
+        validar(c, s)
+        s.add(c)
         s.commit()
         s.refresh(c)
         return c
@@ -70,7 +70,7 @@ def editar(id: int, datos: Candidato):
         c = s.get(Candidato, id)
         if not c:
             raise HTTPException(404, "No encontrado")
-validar(datos, s, id)
+        validar(datos, s, id)
         c.nombre = datos.nombre
         c.email = datos.email
         c.puesto = datos.puesto
