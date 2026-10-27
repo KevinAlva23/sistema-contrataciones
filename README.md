@@ -13,11 +13,13 @@ Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y e
 - Git
 
 ## Ejecutar (recomendado)
-
-    git clone https://github.com/KevinAlva23/sistema-contrataciones.git
-    cd sistema-contrataciones
-    chmod +x iniciar.sh
-    ./iniciar.sh
+	SECRET_KEY=pulsarns200
+	ADMIN_USER=admin
+	ADMIN_PASSWORD=Kev210905
+    	git clone https://github.com/KevinAlva23/sistema-contrataciones.git
+   	cd sistema-contrataciones
+   	 chmod +x iniciar.sh
+    	./iniciar.sh
 
 Abrir http://localhost:8080
 
@@ -71,6 +73,12 @@ Documentación interactiva en http://localhost:8080/api/docs
     podman logs -f frontend    # logs del frontend
 
 ## Historial de cambios
+
+### v1.7 - Usuarios y roles
+- Login con contraseñas cifradas (bcrypt) y sesión JWT de 8 horas
+- Roles: admin, reclutador y consulta
+- Permisos validados en el backend
+- Botones visibles según el rol
 
 ### v1.6 - Script de inicio
 - `iniciar.sh` construye y levanta todo con un comando
