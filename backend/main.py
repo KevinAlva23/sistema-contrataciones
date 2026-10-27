@@ -12,7 +12,7 @@ from sqlmodel import SQLModel, Field, Session, create_engine, select
 # Clave para firmar los tokens. Si no se define, se genera una al azar
 # (las sesiones se cierran al reiniciar el backend).
 SECRET = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-ROLES = ("admin", "reclutador", "consulta")
+ROLES = ("admin", "reclutador", "auditor")
 
 
 class Candidato(SQLModel, table=True):
@@ -172,7 +172,7 @@ def borrar_usuario(id: int, yo: Usuario = Depends(requiere("admin"))):
 
 # ---------- Candidatos ----------
 @app.get("/candidatos")
-def listar(_: Usuario = Depends(requiere("admin", "reclutador", "consulta"))):
+def listar(_: Usuario = Depends(requiere("admin", "reclutador", "auditor"))):
     with Session(engine) as s:
         return s.exec(select(Candidato)).all()
 
