@@ -60,7 +60,7 @@ class CambioUsuario(SQLModel):
     password: Optional[str] = None
 
 
-engine = create_engine("sqlite:////data/contrataciones.db")
+engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:////data/contrataciones.db"))
 SQLModel.metadata.create_all(engine)
 
 
@@ -282,6 +282,7 @@ def crear(c: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))):
         s.refresh(c)
         registrar(s, yo.username, "candidato_creado", f"{c.nombre} (id {c.id})")
         s.commit()
+        s.refresh(c)
         return c
 
 
@@ -300,6 +301,7 @@ def cambiar_estado(
         s.add(c)
         registrar(s, yo.username, "estado_cambiado", f"{c.nombre}: {anterior} -> {estado}")
         s.commit()
+        s.refresh(c)
         return c
 
 
