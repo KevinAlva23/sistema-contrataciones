@@ -101,6 +101,20 @@ Documentación interactiva en http://localhost:8080/api/docs
     podman logs -f backend     # logs del backend
     podman logs -f frontend    # logs del frontend
 
+## Respaldos
+
+    ./respaldo.sh                      # crea un respaldo con fecha
+    ./respaldo.sh listar               # lista los respaldos
+    ./respaldo.sh restaurar ARCHIVO    # restaura uno
+
+La carpeta `respaldos/` no se sube a GitHub: contiene datos personales.
+
+## Pruebas
+
+    cd backend
+    pip install -r requirements.txt -r requirements-dev.txt
+    pytest
+
 ## Historial de cambios
 
 ### v1.13 - Pruebas automáticas
