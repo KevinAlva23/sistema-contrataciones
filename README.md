@@ -103,6 +103,11 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ## Historial de cambios
 
+### v1.10 - Administración de usuarios
+- Pantalla para crear, activar/desactivar y eliminar usuarios
+- Cambio de rol y restablecimiento de contraseña
+- Protección para no quedarse sin administrador
+
 ### v1.9 - Seguridad de acceso
 - Bloqueo de 10 minutos tras 5 intentos fallidos de login
 
