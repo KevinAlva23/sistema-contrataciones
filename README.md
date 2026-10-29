@@ -103,6 +103,12 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ## Historial de cambios
 
+### v1.13 - Pruebas automáticas
+- Pruebas con pytest de login, roles, validaciones, bloqueo y bitácora
+- GitHub Actions ejecuta las pruebas y compila el frontend en cada push
+- La ruta de la base se puede configurar con `DATABASE_URL`
+- Corrección de las respuestas de crear candidato y cambiar estado
+
 ### v1.12 - Respaldos
 - `respaldo.sh` crea copias seguras de la base de datos con fecha
 - Conserva los últimos 14 respaldos y permite programarlos con cron
