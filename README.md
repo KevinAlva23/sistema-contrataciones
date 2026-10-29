@@ -103,6 +103,11 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ## Historial de cambios
 
+### v1.12 - Respaldos
+- `respaldo.sh` crea copias seguras de la base de datos con fecha
+- Conserva los últimos 14 respaldos y permite programarlos con cron
+- Restauración con `./respaldo.sh restaurar ARCHIVO`
+
 ### v1.11 - Bitácora de auditoría
 - Registro de quién crea, edita, cambia el estado o elimina candidatos
 - Registro de altas y cambios de usuarios, inicios de sesión y accesos fallidos
