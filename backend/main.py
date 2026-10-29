@@ -13,6 +13,9 @@ from sqlmodel import SQLModel, Field, Session, create_engine, select
 # (las sesiones se cierran al reiniciar el backend).
 SECRET = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 ROLES = ("admin", "reclutador", "auditor")
+INTENTOS = {}  # username -> (fallos, bloqueado_hasta)
+MAX_FALLOS = 5
+BLOQUEO_MIN = 10
 
 
 class Candidato(SQLModel, table=True):
@@ -107,26 +110,24 @@ def validar(c, s, id_actual=None):
 # ---------- Sesión ----------
 @app.post("/login")
 def login(datos: Login):
+    ahora = datetime.now(timezone.utc)
+    fallos, hasta = INTENTOS.get(datos.username, (0, None))
+    if hasta and ahora < hasta:
+        raise HTTPException(429, "Demasiados intentos. Espera unos minutos.")
     with Session(engine) as s:
         u = s.exec(select(Usuario).where(Usuario.username == datos.username)).first()
         if not u or not u.activo or not verificar(datos.password, u.password_hash):
+            fallos += 1
+            hasta = ahora + timedelta(minutes=BLOQUEO_MIN) if fallos >= MAX_FALLOS else None
+            INTENTOS[datos.username] = (0 if hasta else fallos, hasta)
             raise HTTPException(401, "Usuario o contraseña incorrectos")
+        INTENTOS.pop(datos.username, None)
         token = jwt.encode(
-            {
-                "sub": str(u.id),
-                "exp": datetime.now(timezone.utc) + timedelta(hours=8),
-            },
+            {"sub": str(u.id), "exp": ahora + timedelta(hours=8)},
             SECRET,
             algorithm="HS256",
         )
         return {"token": token, "username": u.username, "rol": u.rol}
-
-
-@app.get("/yo")
-def yo(u: Usuario = Depends(usuario_actual)):
-    return {"username": u.username, "rol": u.rol}
-
-
 # ---------- Usuarios (solo admin) ----------
 @app.get("/usuarios")
 def listar_usuarios(_: Usuario = Depends(requiere("admin"))):
