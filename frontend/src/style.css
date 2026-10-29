@@ -217,3 +217,17 @@ tbody tr:hover { background: #fff6dc; }
 @media (max-width: 520px) {
   .grid-form { grid-template-columns: 1fr; }
 }
+
+/* ============ PESTAÑAS ============ */
+.nav { display: flex; gap: 6px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.nav button {
+  background: white;
+  color: var(--verde-oscuro);
+  border: 1px solid var(--borde);
+}
+.nav button:hover { background: var(--verde-claro); }
+.nav button.activo {
+  background: var(--verde);
+  color: white;
+  border-color: var(--verde);
+}

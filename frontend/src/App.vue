@@ -1,12 +1,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Usuarios from './Usuarios.vue'
+import Bitacora from './Bitacora.vue'
 
 const token = ref(localStorage.getItem('token') || '')
 const usuario = ref(localStorage.getItem('usuario') || '')
 const rol = ref(localStorage.getItem('rol') || '')
 const loginForm = ref({ username: '', password: '' })
 const errorLogin = ref('')
+const vista = ref('candidatos')
 
 const candidatos = ref([])
 const filtro = ref('todos')
@@ -14,12 +16,11 @@ const busqueda = ref('')
 const form = ref({ nombre: '', email: '', puesto: '', telefono: '' })
 const editandoId = ref(null)
 const error = ref('')
-const vista = ref('candidatos')
 
 const puedeEditar = computed(() => ['admin', 'reclutador'].includes(rol.value))
 const puedeBorrar = computed(() => rol.value === 'admin')
+const puedeBitacora = computed(() => ['admin', 'auditor'].includes(rol.value))
 
-// Contadores para las tarjetas de resumen
 const total = computed(() => candidatos.value.length)
 const cuenta = (e) => candidatos.value.filter(c => c.estado === e).length
 
@@ -52,13 +53,15 @@ async function entrar() {
   localStorage.setItem('usuario', d.username)
   localStorage.setItem('rol', d.rol)
   loginForm.value = { username: '', password: '' }
+  vista.value = 'candidatos'
   cargar()
 }
 
 function salir() {
   token.value = ''; usuario.value = ''; rol.value = ''
   candidatos.value = []
-  localStorage.clear(); vista.value = 'candidatos'; vista.value = 'candidatos'
+  vista.value = 'candidatos'
+  localStorage.clear()
 }
 
 const filtrados = computed(() => {
@@ -125,7 +128,6 @@ onMounted(cargar)
 </script>
 
 <template>
-  <!-- Barra superior -->
   <header class="topbar">
     <div class="topbar-in">
       <div class="marca">
@@ -135,7 +137,6 @@ onMounted(cargar)
       <div v-if="token" class="sesion">
         <span class="usuario">{{ usuario }}</span>
         <span class="rol" :class="rol">{{ rol }}</span>
-        <button v-if="rol === 'admin'" class="borde" @click="vista = vista === 'candidatos' ? 'usuarios' : 'candidatos'">{{ vista === 'candidatos' ? 'Usuarios' : 'Candidatos' }}</button>
         <button class="borde" @click="salir">Cerrar sesión</button>
       </div>
     </div>
@@ -143,7 +144,7 @@ onMounted(cargar)
 
   <main class="contenedor">
 
-    <!-- Login centrado -->
+    <!-- Login -->
     <div v-if="!token" class="login-wrap">
       <form class="login" @submit.prevent="entrar">
         <h2>Iniciar sesión</h2>
@@ -155,92 +156,103 @@ onMounted(cargar)
       </form>
     </div>
 
-    <template v-else-if="vista === 'candidatos'">
-      <!-- Tarjetas de resumen -->
-      <section class="stats">
-        <div class="stat">
-          <div class="num">{{ total }}</div>
-          <div class="lbl">Total de candidatos</div>
-        </div>
-        <div class="stat pend">
-          <div class="num">{{ cuenta('pendiente') }}</div>
-          <div class="lbl">Pendientes</div>
-        </div>
-        <div class="stat cont">
-          <div class="num">{{ cuenta('contratado') }}</div>
-          <div class="lbl">Contratados</div>
-        </div>
-        <div class="stat rech">
-          <div class="num">{{ cuenta('rechazado') }}</div>
-          <div class="lbl">Rechazados</div>
-        </div>
-      </section>
+    <template v-else>
+      <!-- Pestañas -->
+      <nav class="nav">
+        <button :class="{ activo: vista === 'candidatos' }" @click="vista = 'candidatos'">Candidatos</button>
+        <button v-if="rol === 'admin'" :class="{ activo: vista === 'usuarios' }" @click="vista = 'usuarios'">Usuarios</button>
+        <button v-if="puedeBitacora" :class="{ activo: vista === 'bitacora' }" @click="vista = 'bitacora'">Bitácora</button>
+      </nav>
 
-      <!-- Formulario (solo admin y reclutador) -->
-      <section v-if="puedeEditar" class="panel">
-        <h2 class="panel-titulo">
-          {{ editandoId !== null ? 'Editar candidato' : 'Nuevo candidato' }}
-        </h2>
-        <form class="panel-cuerpo" @submit.prevent="guardar">
-          <div class="grid-form">
-            <input v-model="form.nombre" placeholder="Nombre" required />
-            <input v-model="form.email" type="email" placeholder="Email" required />
-            <input v-model="form.puesto" placeholder="Puesto" required />
-            <input v-model="form.telefono" placeholder="Teléfono (10 dígitos)" required pattern="[0-9]{10}" title="Escribe 10 números" />
+      <!-- Vista: candidatos -->
+      <template v-if="vista === 'candidatos'">
+        <section class="stats">
+          <div class="stat">
+            <div class="num">{{ total }}</div>
+            <div class="lbl">Total de candidatos</div>
           </div>
-          <div class="acciones-form">
-            <button>{{ editandoId !== null ? 'Guardar cambios' : 'Agregar' }}</button>
-            <button v-if="editandoId !== null" type="button" class="gris" @click="cancelar">Cancelar</button>
+          <div class="stat pend">
+            <div class="num">{{ cuenta('pendiente') }}</div>
+            <div class="lbl">Pendientes</div>
           </div>
-          <p v-if="error" class="error">{{ error }}</p>
-        </form>
-      </section>
+          <div class="stat cont">
+            <div class="num">{{ cuenta('contratado') }}</div>
+            <div class="lbl">Contratados</div>
+          </div>
+          <div class="stat rech">
+            <div class="num">{{ cuenta('rechazado') }}</div>
+            <div class="lbl">Rechazados</div>
+          </div>
+        </section>
 
-      <!-- Tabla con filtros -->
-      <section class="panel">
-        <h2 class="panel-titulo">Candidatos</h2>
-        <div class="toolbar">
-          <input v-model="busqueda" class="buscador" placeholder="Buscar por nombre, email o puesto" />
-          <select v-model="filtro">
-            <option value="todos">Todos los estados</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="contratado">Contratado</option>
-            <option value="rechazado">Rechazado</option>
-          </select>
-          <span class="cuenta">{{ filtrados.length }} resultado(s)</span>
-        </div>
+        <section v-if="puedeEditar" class="panel">
+          <h2 class="panel-titulo">
+            {{ editandoId !== null ? 'Editar candidato' : 'Nuevo candidato' }}
+          </h2>
+          <form class="panel-cuerpo" @submit.prevent="guardar">
+            <div class="grid-form">
+              <input v-model="form.nombre" placeholder="Nombre" required />
+              <input v-model="form.email" type="email" placeholder="Email" required />
+              <input v-model="form.puesto" placeholder="Puesto" required />
+              <input v-model="form.telefono" placeholder="Teléfono (10 dígitos)" required pattern="[0-9]{10}" title="Escribe 10 números" />
+            </div>
+            <div class="acciones-form">
+              <button>{{ editandoId !== null ? 'Guardar cambios' : 'Agregar' }}</button>
+              <button v-if="editandoId !== null" type="button" class="gris" @click="cancelar">Cancelar</button>
+            </div>
+            <p v-if="error" class="error">{{ error }}</p>
+          </form>
+        </section>
 
-        <div class="tabla-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th><th>Email</th><th>Puesto</th>
-                <th>Teléfono</th><th>Estado</th><th v-if="puedeEditar">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!filtrados.length">
-                <td colspan="6" class="vacio">Sin resultados</td>
-              </tr>
-              <tr v-for="c in filtrados" :key="c.id">
-                <td>{{ c.nombre }}</td>
-                <td>{{ c.email }}</td>
-                <td>{{ c.puesto }}</td>
-                <td>{{ c.telefono }}</td>
-                <td><span class="estado" :class="c.estado">{{ c.estado }}</span></td>
-                <td v-if="puedeEditar" class="acciones">
-                  <button class="verde" @click="estado(c.id,'contratado')">Contratar</button>
-                  <button class="rojo" @click="estado(c.id,'rechazado')">Rechazar</button>
-                  <button class="gris" @click="editar(c)">Editar</button>
-                  <button v-if="puedeBorrar" class="rojo" @click="borrar(c)">Eliminar</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <section class="panel">
+          <h2 class="panel-titulo">Candidatos</h2>
+          <div class="toolbar">
+            <input v-model="busqueda" class="buscador" placeholder="Buscar por nombre, email o puesto" />
+            <select v-model="filtro">
+              <option value="todos">Todos los estados</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="contratado">Contratado</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+            <span class="cuenta">{{ filtrados.length }} resultado(s)</span>
+          </div>
+          <div class="tabla-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th><th>Email</th><th>Puesto</th>
+                  <th>Teléfono</th><th>Estado</th><th v-if="puedeEditar">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!filtrados.length">
+                  <td colspan="6" class="vacio">Sin resultados</td>
+                </tr>
+                <tr v-for="c in filtrados" :key="c.id">
+                  <td>{{ c.nombre }}</td>
+                  <td>{{ c.email }}</td>
+                  <td>{{ c.puesto }}</td>
+                  <td>{{ c.telefono }}</td>
+                  <td><span class="estado" :class="c.estado">{{ c.estado }}</span></td>
+                  <td v-if="puedeEditar" class="acciones">
+                    <button class="verde" @click="estado(c.id,'contratado')">Contratar</button>
+                    <button class="rojo" @click="estado(c.id,'rechazado')">Rechazar</button>
+                    <button class="gris" @click="editar(c)">Editar</button>
+                    <button v-if="puedeBorrar" class="rojo" @click="borrar(c)">Eliminar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </template>
+
+      <!-- Vista: usuarios (admin) -->
+      <Usuarios v-else-if="vista === 'usuarios' && rol === 'admin'" :token="token" :yo="usuario" @salir="salir" />
+
+      <!-- Vista: bitácora (admin y auditor) -->
+      <Bitacora v-else-if="vista === 'bitacora' && puedeBitacora" :token="token" @salir="salir" />
     </template>
-    <Usuarios v-else :token="token" :yo="usuario" @salir="salir" />
   </main>
 
   <footer class="pie">Sistema de Contrataciones · Recursos Humanos</footer>

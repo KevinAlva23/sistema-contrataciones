@@ -9,11 +9,11 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 
-# Clave para firmar los tokens. Si no se define, se genera una al azar
-# (las sesiones se cierran al reiniciar el backend).
 SECRET = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 ROLES = ("admin", "reclutador", "auditor")
-INTENTOS = {}  # username -> (fallos, bloqueado_hasta)
+
+# Bloqueo tras intentos fallidos: usuario -> (fallos, bloqueado_hasta)
+INTENTOS = {}
 MAX_FALLOS = 5
 BLOQUEO_MIN = 10
 
@@ -31,8 +31,16 @@ class Usuario(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
     password_hash: str
-    rol: str = "consulta"
+    rol: str = "auditor"
     activo: bool = True
+
+
+class Bitacora(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    fecha: str
+    usuario: str
+    accion: str
+    detalle: str = ""
 
 
 class Login(SQLModel):
@@ -44,6 +52,12 @@ class NuevoUsuario(SQLModel):
     username: str
     password: str
     rol: str
+
+
+class CambioUsuario(SQLModel):
+    rol: Optional[str] = None
+    activo: Optional[bool] = None
+    password: Optional[str] = None
 
 
 engine = create_engine("sqlite:////data/contrataciones.db")
@@ -58,7 +72,17 @@ def verificar(password: str, hash_guardado: str) -> bool:
     return bcrypt.checkpw(password.encode(), hash_guardado.encode())
 
 
-# Crea el primer administrador si todavía no existe ningún usuario
+def registrar(s, quien, accion, detalle=""):
+    """Agrega un registro a la bitácora (se guarda con el commit de la sesión)."""
+    s.add(Bitacora(
+        fecha=datetime.now(timezone.utc).isoformat(),
+        usuario=quien,
+        accion=accion,
+        detalle=detalle,
+    ))
+
+
+# Primer administrador si todavía no existe ningún usuario
 with Session(engine) as s:
     if not s.exec(select(Usuario)).first():
         clave = os.environ.get("ADMIN_PASSWORD")
@@ -120,14 +144,39 @@ def login(datos: Login):
             fallos += 1
             hasta = ahora + timedelta(minutes=BLOQUEO_MIN) if fallos >= MAX_FALLOS else None
             INTENTOS[datos.username] = (0 if hasta else fallos, hasta)
+            detalle = "Cuenta bloqueada 10 min" if hasta else f"Intento fallido {fallos}"
+            registrar(s, datos.username[:50], "login_fallido", detalle)
+            s.commit()
             raise HTTPException(401, "Usuario o contraseña incorrectos")
         INTENTOS.pop(datos.username, None)
+        registrar(s, u.username, "login", "Inicio de sesión")
+        s.commit()
         token = jwt.encode(
             {"sub": str(u.id), "exp": ahora + timedelta(hours=8)},
             SECRET,
             algorithm="HS256",
         )
         return {"token": token, "username": u.username, "rol": u.rol}
+
+
+@app.get("/yo")
+def yo(u: Usuario = Depends(usuario_actual)):
+    return {"username": u.username, "rol": u.rol}
+
+
+# ---------- Bitácora (admin y auditor) ----------
+@app.get("/bitacora")
+def ver_bitacora(limite: int = 300, _: Usuario = Depends(requiere("admin", "auditor"))):
+    limite = max(1, min(limite, 1000))
+    with Session(engine) as s:
+        filas = s.exec(select(Bitacora).order_by(Bitacora.id.desc()).limit(limite)).all()
+        return [
+            {"id": b.id, "fecha": b.fecha, "usuario": b.usuario,
+             "accion": b.accion, "detalle": b.detalle}
+            for b in filas
+        ]
+
+
 # ---------- Usuarios (solo admin) ----------
 @app.get("/usuarios")
 def listar_usuarios(_: Usuario = Depends(requiere("admin"))):
@@ -139,7 +188,7 @@ def listar_usuarios(_: Usuario = Depends(requiere("admin"))):
 
 
 @app.post("/usuarios")
-def crear_usuario(datos: NuevoUsuario, _: Usuario = Depends(requiere("admin"))):
+def crear_usuario(datos: NuevoUsuario, yo: Usuario = Depends(requiere("admin"))):
     if datos.rol not in ROLES:
         raise HTTPException(422, "Rol inválido")
     if len(datos.password) < 8:
@@ -153,9 +202,54 @@ def crear_usuario(datos: NuevoUsuario, _: Usuario = Depends(requiere("admin"))):
             rol=datos.rol,
         )
         s.add(u)
+        registrar(s, yo.username, "usuario_creado", f"{datos.username} ({datos.rol})")
         s.commit()
         s.refresh(u)
         return {"id": u.id, "username": u.username, "rol": u.rol}
+
+
+@app.patch("/usuarios/{id}")
+def actualizar_usuario(
+    id: int, datos: CambioUsuario, yo: Usuario = Depends(requiere("admin"))
+):
+    with Session(engine) as s:
+        u = s.get(Usuario, id)
+        if not u:
+            raise HTTPException(404, "No encontrado")
+        if datos.rol is not None and datos.rol not in ROLES:
+            raise HTTPException(422, "Rol inválido")
+        if datos.password is not None and len(datos.password) < 8:
+            raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres")
+
+        # No te quites tus permisos ni dejes el sistema sin administrador
+        pierde_admin = u.rol == "admin" and (
+            datos.activo is False or (datos.rol is not None and datos.rol != "admin")
+        )
+        if pierde_admin:
+            if id == yo.id:
+                raise HTTPException(400, "No puedes quitarte tus propios permisos")
+            admins = s.exec(
+                select(Usuario).where(Usuario.rol == "admin", Usuario.activo == True)
+            ).all()
+            if len(admins) <= 1:
+                raise HTTPException(400, "Debe quedar al menos un administrador activo")
+
+        cambios = []
+        if datos.rol is not None and datos.rol != u.rol:
+            cambios.append(f"rol: {u.rol} -> {datos.rol}")
+            u.rol = datos.rol
+        if datos.activo is not None and datos.activo != u.activo:
+            cambios.append("activado" if datos.activo else "desactivado")
+            u.activo = datos.activo
+        if datos.password is not None:
+            cambios.append("contraseña restablecida")
+            u.password_hash = hashear(datos.password)
+            INTENTOS.pop(u.username, None)
+        s.add(u)
+        if cambios:
+            registrar(s, yo.username, "usuario_modificado", f"{u.username}: " + ", ".join(cambios))
+        s.commit()
+        return {"id": u.id, "username": u.username, "rol": u.rol, "activo": u.activo}
 
 
 @app.delete("/usuarios/{id}")
@@ -166,6 +260,7 @@ def borrar_usuario(id: int, yo: Usuario = Depends(requiere("admin"))):
         u = s.get(Usuario, id)
         if not u:
             raise HTTPException(404, "No encontrado")
+        registrar(s, yo.username, "usuario_eliminado", u.username)
         s.delete(u)
         s.commit()
         return {"ok": True}
@@ -179,18 +274,20 @@ def listar(_: Usuario = Depends(requiere("admin", "reclutador", "auditor"))):
 
 
 @app.post("/candidatos")
-def crear(c: Candidato, _: Usuario = Depends(requiere("admin", "reclutador"))):
+def crear(c: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))):
     with Session(engine) as s:
         validar(c, s)
         s.add(c)
         s.commit()
         s.refresh(c)
+        registrar(s, yo.username, "candidato_creado", f"{c.nombre} (id {c.id})")
+        s.commit()
         return c
 
 
 @app.patch("/candidatos/{id}")
 def cambiar_estado(
-    id: int, estado: str, _: Usuario = Depends(requiere("admin", "reclutador"))
+    id: int, estado: str, yo: Usuario = Depends(requiere("admin", "reclutador"))
 ):
     if estado not in ("pendiente", "contratado", "rechazado"):
         raise HTTPException(400, "Estado inválido")
@@ -198,15 +295,17 @@ def cambiar_estado(
         c = s.get(Candidato, id)
         if not c:
             raise HTTPException(404, "No encontrado")
+        anterior = c.estado
         c.estado = estado
         s.add(c)
+        registrar(s, yo.username, "estado_cambiado", f"{c.nombre}: {anterior} -> {estado}")
         s.commit()
         return c
 
 
 @app.put("/candidatos/{id}")
 def editar(
-    id: int, datos: Candidato, _: Usuario = Depends(requiere("admin", "reclutador"))
+    id: int, datos: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))
 ):
     with Session(engine) as s:
         c = s.get(Candidato, id)
@@ -218,62 +317,19 @@ def editar(
         c.puesto = datos.puesto
         c.telefono = datos.telefono
         s.add(c)
+        registrar(s, yo.username, "candidato_editado", f"{c.nombre} (id {c.id})")
         s.commit()
         s.refresh(c)
         return c
 
 
 @app.delete("/candidatos/{id}")
-def borrar(id: int, _: Usuario = Depends(requiere("admin"))):
+def borrar(id: int, yo: Usuario = Depends(requiere("admin"))):
     with Session(engine) as s:
         c = s.get(Candidato, id)
         if not c:
             raise HTTPException(404, "No encontrado")
+        registrar(s, yo.username, "candidato_eliminado", f"{c.nombre} (id {c.id})")
         s.delete(c)
         s.commit()
         return {"ok": True}
-
-
-class CambioUsuario(SQLModel):
-    rol: Optional[str] = None
-    activo: Optional[bool] = None
-    password: Optional[str] = None
-
-
-@app.patch("/usuarios/{id}")
-def actualizar_usuario(
-    id: int, datos: CambioUsuario, yo: Usuario = Depends(requiere("admin"))
-):
-    with Session(engine) as s:
-        u = s.get(Usuario, id)
-        if not u:
-            raise HTTPException(404, "No encontrado")
-
-        if datos.rol is not None and datos.rol not in ROLES:
-            raise HTTPException(422, "Rol inválido")
-        if datos.password is not None and len(datos.password) < 8:
-            raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres")
-
-        # No te quites tus propios permisos ni dejes el sistema sin administrador
-        pierde_admin = u.rol == "admin" and (
-            datos.activo is False or (datos.rol is not None and datos.rol != "admin")
-        )
-        if pierde_admin:
-            if id == yo.id:
-                raise HTTPException(400, "No puedes quitarte tus propios permisos")
-            admins = s.exec(
-                select(Usuario).where(Usuario.rol == "admin", Usuario.activo == True)
-            ).all()
-            if len(admins) <= 1:
-                raise HTTPException(400, "Debe quedar al menos un administrador activo")
-
-        if datos.rol is not None:
-            u.rol = datos.rol
-        if datos.activo is not None:
-            u.activo = datos.activo
-        if datos.password is not None:
-            u.password_hash = hashear(datos.password)
-            globals().get("INTENTOS", {}).pop(u.username, None)
-        s.add(u)
-        s.commit()
-        return {"id": u.id, "username": u.username, "rol": u.rol, "activo": u.activo}
