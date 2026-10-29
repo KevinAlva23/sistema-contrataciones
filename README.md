@@ -103,6 +103,11 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ## Historial de cambios
 
+### v1.11 - Bitácora de auditoría
+- Registro de quién crea, edita, cambia el estado o elimina candidatos
+- Registro de altas y cambios de usuarios, inicios de sesión y accesos fallidos
+- Pestaña Bitácora para admin y auditor (solo lectura)
+
 ### v1.10 - Administración de usuarios
 - Pantalla para crear, activar/desactivar y eliminar usuarios
 - Cambio de rol y restablecimiento de contraseña
