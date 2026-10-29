@@ -103,6 +103,9 @@ Documentación interactiva en http://localhost:8080/api/docs
 
 ## Historial de cambios
 
+### v1.9 - Seguridad de acceso
+- Bloqueo de 10 minutos tras 5 intentos fallidos de login
+
 ### v1.8 - Rediseño
 - Barra superior con usuario y rol
 - Tarjetas de resumen por estado
