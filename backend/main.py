@@ -232,3 +232,48 @@ def borrar(id: int, _: Usuario = Depends(requiere("admin"))):
         s.delete(c)
         s.commit()
         return {"ok": True}
+
+
+class CambioUsuario(SQLModel):
+    rol: Optional[str] = None
+    activo: Optional[bool] = None
+    password: Optional[str] = None
+
+
+@app.patch("/usuarios/{id}")
+def actualizar_usuario(
+    id: int, datos: CambioUsuario, yo: Usuario = Depends(requiere("admin"))
+):
+    with Session(engine) as s:
+        u = s.get(Usuario, id)
+        if not u:
+            raise HTTPException(404, "No encontrado")
+
+        if datos.rol is not None and datos.rol not in ROLES:
+            raise HTTPException(422, "Rol inválido")
+        if datos.password is not None and len(datos.password) < 8:
+            raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres")
+
+        # No te quites tus propios permisos ni dejes el sistema sin administrador
+        pierde_admin = u.rol == "admin" and (
+            datos.activo is False or (datos.rol is not None and datos.rol != "admin")
+        )
+        if pierde_admin:
+            if id == yo.id:
+                raise HTTPException(400, "No puedes quitarte tus propios permisos")
+            admins = s.exec(
+                select(Usuario).where(Usuario.rol == "admin", Usuario.activo == True)
+            ).all()
+            if len(admins) <= 1:
+                raise HTTPException(400, "Debe quedar al menos un administrador activo")
+
+        if datos.rol is not None:
+            u.rol = datos.rol
+        if datos.activo is not None:
+            u.activo = datos.activo
+        if datos.password is not None:
+            u.password_hash = hashear(datos.password)
+            globals().get("INTENTOS", {}).pop(u.username, None)
+        s.add(u)
+        s.commit()
+        return {"id": u.id, "username": u.username, "rol": u.rol, "activo": u.activo}

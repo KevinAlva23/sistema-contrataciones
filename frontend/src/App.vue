@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import Usuarios from './Usuarios.vue'
 
 const token = ref(localStorage.getItem('token') || '')
 const usuario = ref(localStorage.getItem('usuario') || '')
@@ -13,6 +14,7 @@ const busqueda = ref('')
 const form = ref({ nombre: '', email: '', puesto: '', telefono: '' })
 const editandoId = ref(null)
 const error = ref('')
+const vista = ref('candidatos')
 
 const puedeEditar = computed(() => ['admin', 'reclutador'].includes(rol.value))
 const puedeBorrar = computed(() => rol.value === 'admin')
@@ -56,7 +58,7 @@ async function entrar() {
 function salir() {
   token.value = ''; usuario.value = ''; rol.value = ''
   candidatos.value = []
-  localStorage.clear()
+  localStorage.clear(); vista.value = 'candidatos'; vista.value = 'candidatos'
 }
 
 const filtrados = computed(() => {
@@ -133,6 +135,7 @@ onMounted(cargar)
       <div v-if="token" class="sesion">
         <span class="usuario">{{ usuario }}</span>
         <span class="rol" :class="rol">{{ rol }}</span>
+        <button v-if="rol === 'admin'" class="borde" @click="vista = vista === 'candidatos' ? 'usuarios' : 'candidatos'">{{ vista === 'candidatos' ? 'Usuarios' : 'Candidatos' }}</button>
         <button class="borde" @click="salir">Cerrar sesión</button>
       </div>
     </div>
@@ -152,7 +155,7 @@ onMounted(cargar)
       </form>
     </div>
 
-    <template v-else>
+    <template v-else-if="vista === 'candidatos'">
       <!-- Tarjetas de resumen -->
       <section class="stats">
         <div class="stat">
@@ -237,6 +240,7 @@ onMounted(cargar)
         </div>
       </section>
     </template>
+    <Usuarios v-else :token="token" :yo="usuario" @salir="salir" />
   </main>
 
   <footer class="pie">Sistema de Contrataciones · Recursos Humanos</footer>
