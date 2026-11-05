@@ -140,6 +140,11 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.17 - Endurecimiento
+- Cabeceras de seguridad en Nginx (CSP, X-Frame-Options, nosniff)
+- Contenedores de solo lectura, sin privilegios extra y con límites de memoria
+- Reinicio automático de los contenedores
+
 ### v1.16 - Estadísticas
 - Pestaña Estadísticas: totales, tasa de contratación, por estado, puesto y mes
 - Fecha de registro de cada candidato (migración automática de la columna)
