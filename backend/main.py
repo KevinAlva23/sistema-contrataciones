@@ -72,6 +72,22 @@ def verificar(password: str, hash_guardado: str) -> bool:
     return bcrypt.checkpw(password.encode(), hash_guardado.encode())
 
 
+def politica(clave: str):
+    """Exige 10+ caracteres con mayúscula, minúscula y número."""
+    if (len(clave) < 10 or not any(c.isupper() for c in clave)
+            or not any(c.islower() for c in clave)
+            or not any(c.isdigit() for c in clave)):
+        raise HTTPException(
+            422,
+            "La contraseña debe tener al menos 10 caracteres, con mayúscula, minúscula y número",
+        )
+
+
+class CambioClave(SQLModel):
+    actual: str
+    nueva: str
+
+
 def registrar(s, quien, accion, detalle=""):
     """Agrega un registro a la bitácora (se guarda con el commit de la sesión)."""
     s.add(Bitacora(
@@ -164,6 +180,22 @@ def yo(u: Usuario = Depends(usuario_actual)):
     return {"username": u.username, "rol": u.rol}
 
 
+@app.post("/cambiar-clave")
+def cambiar_clave(datos: CambioClave, yo: Usuario = Depends(usuario_actual)):
+    politica(datos.nueva)
+    with Session(engine) as s:
+        u = s.get(Usuario, yo.id)
+        if not verificar(datos.actual, u.password_hash):
+            raise HTTPException(400, "La contraseña actual no es correcta")
+        if datos.actual == datos.nueva:
+            raise HTTPException(422, "La nueva contraseña debe ser distinta")
+        u.password_hash = hashear(datos.nueva)
+        s.add(u)
+        registrar(s, u.username, "clave_cambiada", "Cambió su propia contraseña")
+        s.commit()
+        return {"ok": True}
+
+
 # ---------- Bitácora (admin y auditor) ----------
 @app.get("/bitacora")
 def ver_bitacora(limite: int = 300, _: Usuario = Depends(requiere("admin", "auditor"))):
@@ -191,8 +223,7 @@ def listar_usuarios(_: Usuario = Depends(requiere("admin"))):
 def crear_usuario(datos: NuevoUsuario, yo: Usuario = Depends(requiere("admin"))):
     if datos.rol not in ROLES:
         raise HTTPException(422, "Rol inválido")
-    if len(datos.password) < 8:
-        raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres")
+    politica(datos.password)
     with Session(engine) as s:
         if s.exec(select(Usuario).where(Usuario.username == datos.username)).first():
             raise HTTPException(409, "Ese usuario ya existe")
@@ -218,8 +249,8 @@ def actualizar_usuario(
             raise HTTPException(404, "No encontrado")
         if datos.rol is not None and datos.rol not in ROLES:
             raise HTTPException(422, "Rol inválido")
-        if datos.password is not None and len(datos.password) < 8:
-            raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres")
+        if datos.password is not None:
+            politica(datos.password)
 
         # No te quites tus permisos ni dejes el sistema sin administrador
         pierde_admin = u.rol == "admin" and (

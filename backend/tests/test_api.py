@@ -100,3 +100,30 @@ def test_bitacora_registra_acciones(client, admin, auditor):
     assert r.status_code == 200
     acciones = {b["accion"] for b in r.json()}
     assert {"login", "candidato_creado"} <= acciones
+
+
+# ---------- Cambio de contraseña y política ----------
+def test_politica_rechaza_clave_debil(client, admin):
+    r = client.post("/usuarios", headers=admin,
+                    json={"username": "debil", "password": "abcdefgh", "rol": "auditor"})
+    assert r.status_code == 422
+
+
+def test_cambiar_clave_propia(client, admin):
+    client.post("/usuarios", headers=admin,
+                json={"username": "cambia", "password": "ClaveVieja123", "rol": "auditor"})
+    r = client.post("/login", json={"username": "cambia", "password": "ClaveVieja123"})
+    h = {"Authorization": f"Bearer {r.json()['token']}"}
+
+    # La actual incorrecta se rechaza
+    assert client.post("/cambiar-clave", headers=h,
+                       json={"actual": "otra", "nueva": "ClaveNueva456"}).status_code == 400
+    # Una nueva débil se rechaza
+    assert client.post("/cambiar-clave", headers=h,
+                       json={"actual": "ClaveVieja123", "nueva": "corta"}).status_code == 422
+    # Cambio correcto
+    assert client.post("/cambiar-clave", headers=h,
+                       json={"actual": "ClaveVieja123", "nueva": "ClaveNueva456"}).status_code == 200
+    # La vieja ya no sirve y la nueva sí
+    assert client.post("/login", json={"username": "cambia", "password": "ClaveVieja123"}).status_code == 401
+    assert client.post("/login", json={"username": "cambia", "password": "ClaveNueva456"}).status_code == 200

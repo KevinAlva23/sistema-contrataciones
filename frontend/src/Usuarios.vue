@@ -62,7 +62,7 @@ const alternar = (u) => cambiar(u, { activo: !u.activo })
 const cambiarRol = (u, e) => cambiar(u, { rol: e.target.value })
 
 function restablecer(u) {
-  const p = prompt(`Nueva contraseña para ${u.username} (mínimo 8 caracteres):`)
+  const p = prompt(`Nueva contraseña para ${u.username} (mínimo 10, con mayúscula, minúscula y número):`)
   if (p) cambiar(u, { password: p })
 }
 
@@ -84,7 +84,7 @@ onMounted(cargar)
     <form class="panel-cuerpo" @submit.prevent="crear">
       <div class="grid-form">
         <input v-model="nuevo.username" placeholder="Usuario" required />
-        <input v-model="nuevo.password" type="password" placeholder="Contraseña (mín. 8)" required minlength="8" />
+        <input v-model="nuevo.password" type="password" placeholder="Contraseña (mín. 10)" required minlength="10" />
         <select v-model="nuevo.rol">
           <option value="admin">admin</option>
           <option value="reclutador">reclutador</option>
