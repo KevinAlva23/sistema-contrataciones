@@ -27,7 +27,7 @@ echo "3/5 Limpiando contenedores anteriores..."
 podman rm -f frontend backend 2>/dev/null || true
 
 echo "4/5 Levantando backend..."
-podman run -d --name backend --env-file .env --network $RED -v $VOLUMEN:/data localhost/contrataciones_backend
+podman run -d --name backend --env-file .env --network $RED -v $VOLUMEN:/data --read-only --tmpfs /tmp --cap-drop=ALL --security-opt no-new-privileges --memory 512m --pids-limit 200 --restart unless-stopped localhost/contrataciones_backend
 
 # Espera hasta 15 segundos a que el backend arranque
 for i in $(seq 1 15); do
@@ -42,6 +42,6 @@ for i in $(seq 1 15); do
 done
 
 echo "5/5 Levantando frontend..."
-podman run -d --name frontend --network $RED -p 8080:80 localhost/contrataciones_frontend
+podman run -d --name frontend --network $RED -p 8080:80 --read-only --tmpfs /tmp --tmpfs /var/cache/nginx --tmpfs /var/run --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID --cap-add=NET_BIND_SERVICE --security-opt no-new-privileges --memory 256m --pids-limit 200 --restart unless-stopped localhost/contrataciones_frontend
 
 echo "Listo. Abre http://localhost:8080"
