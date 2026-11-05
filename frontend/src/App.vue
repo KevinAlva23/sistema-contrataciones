@@ -125,6 +125,19 @@ async function borrar(c) {
   try { await api(`/api/candidatos/${c.id}`, { method: 'DELETE' }); cargar() } catch (x) {}
 }
 
+async function exportar() {
+  try {
+    const r = await api('/api/candidatos/exportar')
+    if (!r.ok) { error.value = 'No se pudo exportar'; return }
+    const blob = await r.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'candidatos.csv'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  } catch (e) {}
+}
+
 onMounted(cargar)
 </script>
 
@@ -217,6 +230,7 @@ onMounted(cargar)
               <option value="rechazado">Rechazado</option>
             </select>
             <span class="cuenta">{{ filtrados.length }} resultado(s)</span>
+            <button v-if="puedeBitacora" class="gris" @click="exportar">Exportar CSV</button>
           </div>
           <div class="tabla-scroll">
             <table>

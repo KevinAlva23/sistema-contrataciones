@@ -1,3 +1,5 @@
+import csv
+import io
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -6,6 +8,7 @@ from typing import Optional
 import bcrypt
 import jwt
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 
@@ -298,6 +301,31 @@ def borrar_usuario(id: int, yo: Usuario = Depends(requiere("admin"))):
 
 
 # ---------- Candidatos ----------
+def _seguro(valor):
+    """Evita inyección de fórmulas al abrir el CSV en Excel."""
+    v = str(valor)
+    return "'" + v if v[:1] in ("=", "+", "-", "@") else v
+
+
+@app.get("/candidatos/exportar")
+def exportar_csv(yo: Usuario = Depends(requiere("admin", "auditor"))):
+    with Session(engine) as s:
+        filas = s.exec(select(Candidato).order_by(Candidato.id)).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["id", "nombre", "email", "puesto", "telefono", "estado"])
+        for c in filas:
+            w.writerow([c.id, _seguro(c.nombre), _seguro(c.email),
+                        _seguro(c.puesto), _seguro(c.telefono), c.estado])
+        registrar(s, yo.username, "exportacion", f"Exportó {len(filas)} candidatos a CSV")
+        s.commit()
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=candidatos.csv"},
+    )
+
+
 @app.get("/candidatos")
 def listar(_: Usuario = Depends(requiere("admin", "reclutador", "auditor"))):
     with Session(engine) as s:

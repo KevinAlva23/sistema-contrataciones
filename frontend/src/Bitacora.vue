@@ -17,7 +17,9 @@ const etiquetas = {
   estado_cambiado: 'Cambio de estado',
   usuario_creado: 'Usuario creado',
   usuario_modificado: 'Usuario modificado',
-  usuario_eliminado: 'Usuario eliminado'
+  usuario_eliminado: 'Usuario eliminado',
+  exportacion: 'Exportación CSV',
+  clave_cambiada: 'Contraseña cambiada'
 }
 
 // Color de la etiqueta según la gravedad de la acción

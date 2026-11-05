@@ -127,3 +127,14 @@ def test_cambiar_clave_propia(client, admin):
     # La vieja ya no sirve y la nueva sí
     assert client.post("/login", json={"username": "cambia", "password": "ClaveVieja123"}).status_code == 401
     assert client.post("/login", json={"username": "cambia", "password": "ClaveNueva456"}).status_code == 200
+
+
+# ---------- Exportación ----------
+def test_exportar_csv_solo_admin_y_auditor(client, admin, auditor, reclutador):
+    client.post("/candidatos", headers=admin, json=candidato(nombre="=CMD()"))
+    r = client.get("/candidatos/exportar", headers=auditor)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    assert "'=CMD()" in r.text          # la fórmula queda neutralizada
+    assert client.get("/candidatos/exportar", headers=reclutador).status_code == 403
+    assert client.get("/candidatos/exportar").status_code == 401
