@@ -231,3 +231,13 @@ tbody tr:hover { background: #fff6dc; }
   color: white;
   border-color: var(--verde);
 }
+
+/* ============ BARRAS ============ */
+.barra-fila { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.barra-et { width: 140px; font-size: 0.9rem; text-transform: capitalize; }
+.barra-pista { flex: 1; background: var(--gris); border-radius: 6px; height: 18px; overflow: hidden; }
+.barra { height: 100%; background: var(--verde); border-radius: 6px; min-width: 4px; }
+.barra.pendiente { background: var(--dorado); }
+.barra.contratado { background: var(--verde); }
+.barra.rechazado { background: var(--rojo); }
+.barra-num { width: 32px; text-align: right; font-weight: 700; }

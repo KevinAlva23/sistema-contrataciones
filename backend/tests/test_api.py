@@ -138,3 +138,14 @@ def test_exportar_csv_solo_admin_y_auditor(client, admin, auditor, reclutador):
     assert "'=CMD()" in r.text          # la fórmula queda neutralizada
     assert client.get("/candidatos/exportar", headers=reclutador).status_code == 403
     assert client.get("/candidatos/exportar").status_code == 401
+
+
+# ---------- Estadísticas ----------
+def test_estadisticas(client, admin, auditor, reclutador):
+    client.post("/candidatos", headers=admin, json=candidato())
+    r = client.get("/estadisticas", headers=auditor)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["total"] >= 1
+    assert "por_estado" in d and "por_puesto" in d and "por_mes" in d
+    assert client.get("/estadisticas", headers=reclutador).status_code == 403

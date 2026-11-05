@@ -28,6 +28,7 @@ class Candidato(SQLModel, table=True):
     puesto: str
     telefono: str
     estado: str = "pendiente"
+    creado: Optional[str] = None
 
 
 class Usuario(SQLModel, table=True):
@@ -65,6 +66,13 @@ class CambioUsuario(SQLModel):
 
 engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:////data/contrataciones.db"))
 SQLModel.metadata.create_all(engine)
+
+# Migración sencilla: agrega la columna "creado" a bases anteriores
+with engine.begin() as _c:
+    from sqlalchemy import text as _text
+    _cols = [r[1] for r in _c.execute(_text("PRAGMA table_info(candidato)"))]
+    if "creado" not in _cols:
+        _c.execute(_text("ALTER TABLE candidato ADD COLUMN creado VARCHAR"))
 
 
 def hashear(password: str) -> str:
@@ -307,6 +315,28 @@ def _seguro(valor):
     return "'" + v if v[:1] in ("=", "+", "-", "@") else v
 
 
+@app.get("/estadisticas")
+def estadisticas(_: Usuario = Depends(requiere("admin", "auditor"))):
+    with Session(engine) as s:
+        filas = s.exec(select(Candidato)).all()
+    por_estado, por_puesto, por_mes = {}, {}, {}
+    for c in filas:
+        por_estado[c.estado] = por_estado.get(c.estado, 0) + 1
+        p = c.puesto.strip().title()
+        por_puesto[p] = por_puesto.get(p, 0) + 1
+        mes = c.creado[:7] if c.creado else "Sin fecha"
+        por_mes[mes] = por_mes.get(mes, 0) + 1
+    resueltos = por_estado.get("contratado", 0) + por_estado.get("rechazado", 0)
+    tasa = round(100 * por_estado.get("contratado", 0) / resueltos, 1) if resueltos else None
+    return {
+        "total": len(filas),
+        "tasa_contratacion": tasa,
+        "por_estado": por_estado,
+        "por_puesto": dict(sorted(por_puesto.items(), key=lambda x: -x[1])[:10]),
+        "por_mes": dict(sorted(por_mes.items())),
+    }
+
+
 @app.get("/candidatos/exportar")
 def exportar_csv(yo: Usuario = Depends(requiere("admin", "auditor"))):
     with Session(engine) as s:
@@ -336,6 +366,7 @@ def listar(_: Usuario = Depends(requiere("admin", "reclutador", "auditor"))):
 def crear(c: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))):
     with Session(engine) as s:
         validar(c, s)
+        c.creado = datetime.now(timezone.utc).isoformat()
         s.add(c)
         s.commit()
         s.refresh(c)

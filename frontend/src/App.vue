@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import Usuarios from './Usuarios.vue'
 import Bitacora from './Bitacora.vue'
+import Estadisticas from './Estadisticas.vue'
 import MiCuenta from './MiCuenta.vue'
 
 const token = ref(localStorage.getItem('token') || '')
@@ -175,6 +176,7 @@ onMounted(cargar)
       <nav class="nav">
         <button :class="{ activo: vista === 'candidatos' }" @click="vista = 'candidatos'">Candidatos</button>
         <button v-if="rol === 'admin'" :class="{ activo: vista === 'usuarios' }" @click="vista = 'usuarios'">Usuarios</button>
+        <button v-if="puedeBitacora" :class="{ activo: vista === 'estadisticas' }" @click="vista = 'estadisticas'">Estadísticas</button>
         <button v-if="puedeBitacora" :class="{ activo: vista === 'bitacora' }" @click="vista = 'bitacora'">Bitácora</button>
         <button :class="{ activo: vista === 'cuenta' }" @click="vista = 'cuenta'">Mi cuenta</button>
       </nav>
@@ -267,6 +269,8 @@ onMounted(cargar)
       <Usuarios v-else-if="vista === 'usuarios' && rol === 'admin'" :token="token" :yo="usuario" @salir="salir" />
 
       <!-- Vista: bitácora (admin y auditor) -->
+      <Estadisticas v-else-if="vista === 'estadisticas' && puedeBitacora" :token="token" @salir="salir" />
+
       <Bitacora v-else-if="vista === 'bitacora' && puedeBitacora" :token="token" @salir="salir" />
 
       <!-- Vista: mi cuenta (todos los roles) -->
