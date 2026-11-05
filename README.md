@@ -1,7 +1,5 @@
 # Sistema de Contrataciones
 
-![Pruebas](https://github.com/KevinAlva23/sistema-contrataciones/actions/workflows/tests.yml/badge.svg)
-
 Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado), con inicio de sesión, roles, bitácora de auditoría y respaldos, ejecutada en contenedores con Podman.
 
 ## Tecnologías
