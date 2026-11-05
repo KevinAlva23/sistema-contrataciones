@@ -140,6 +140,10 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.16 - Estadísticas
+- Pestaña Estadísticas: totales, tasa de contratación, por estado, puesto y mes
+- Fecha de registro de cada candidato (migración automática de la columna)
+
 ### v1.15 - Exportación
 - Exportar candidatos a CSV (admin y auditor)
 - Neutraliza fórmulas peligrosas en Excel
