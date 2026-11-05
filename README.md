@@ -140,6 +140,11 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.15 - Exportación
+- Exportar candidatos a CSV (admin y auditor)
+- Neutraliza fórmulas peligrosas en Excel
+- Cada exportación queda en la bitácora
+
 ### v1.14 - Contraseñas
 - Pestaña Mi cuenta para cambiar la contraseña propia
 - Política de contraseñas: 10+ caracteres con mayúscula, minúscula y número
