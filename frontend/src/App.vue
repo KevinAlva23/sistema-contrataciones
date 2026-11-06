@@ -143,6 +143,7 @@ onMounted(cargar)
 </script>
 
 <template>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
   <header class="topbar">
     <div class="topbar-in">
       <div class="marca">
@@ -157,28 +158,28 @@ onMounted(cargar)
     </div>
   </header>
 
-  <main class="contenedor">
+  <main id="contenido" class="contenedor" tabindex="-1">
 
     <!-- Login -->
     <div v-if="!token" class="login-wrap">
       <form class="login" @submit.prevent="entrar">
         <h2>Iniciar sesión</h2>
         <p class="sub">Ingresa con tu cuenta asignada</p>
-        <input v-model="loginForm.username" placeholder="Usuario" required />
-        <input v-model="loginForm.password" type="password" placeholder="Contraseña" required />
+        <input aria-label="Usuario" v-model="loginForm.username" placeholder="Usuario" required />
+        <input aria-label="Contraseña" v-model="loginForm.password" type="password" placeholder="Contraseña" required />
         <button>Entrar</button>
-        <p v-if="errorLogin" class="error">{{ errorLogin }}</p>
+        <p v-if="errorLogin" class="error" role="alert">{{ errorLogin }}</p>
       </form>
     </div>
 
     <template v-else>
       <!-- Pestañas -->
-      <nav class="nav">
-        <button :class="{ activo: vista === 'candidatos' }" @click="vista = 'candidatos'">Candidatos</button>
-        <button v-if="rol === 'admin'" :class="{ activo: vista === 'usuarios' }" @click="vista = 'usuarios'">Usuarios</button>
-        <button v-if="puedeBitacora" :class="{ activo: vista === 'estadisticas' }" @click="vista = 'estadisticas'">Estadísticas</button>
-        <button v-if="puedeBitacora" :class="{ activo: vista === 'bitacora' }" @click="vista = 'bitacora'">Bitácora</button>
-        <button :class="{ activo: vista === 'cuenta' }" @click="vista = 'cuenta'">Mi cuenta</button>
+      <nav class="nav" aria-label="Secciones">
+        <button :class="{ activo: vista === 'candidatos' }" :aria-current="vista === 'candidatos' ? 'page' : undefined" @click="vista = 'candidatos'">Candidatos</button>
+        <button v-if="rol === 'admin'" :class="{ activo: vista === 'usuarios' }" :aria-current="vista === 'usuarios' ? 'page' : undefined" @click="vista = 'usuarios'">Usuarios</button>
+        <button v-if="puedeBitacora" :class="{ activo: vista === 'estadisticas' }" :aria-current="vista === 'estadisticas' ? 'page' : undefined" @click="vista = 'estadisticas'">Estadísticas</button>
+        <button v-if="puedeBitacora" :class="{ activo: vista === 'bitacora' }" :aria-current="vista === 'bitacora' ? 'page' : undefined" @click="vista = 'bitacora'">Bitácora</button>
+        <button :class="{ activo: vista === 'cuenta' }" :aria-current="vista === 'cuenta' ? 'page' : undefined" @click="vista = 'cuenta'">Mi cuenta</button>
       </nav>
 
       <!-- Vista: candidatos -->
@@ -208,24 +209,24 @@ onMounted(cargar)
           </h2>
           <form class="panel-cuerpo" @submit.prevent="guardar">
             <div class="grid-form">
-              <input v-model="form.nombre" placeholder="Nombre" required />
-              <input v-model="form.email" type="email" placeholder="Email" required />
-              <input v-model="form.puesto" placeholder="Puesto" required />
-              <input v-model="form.telefono" placeholder="Teléfono (10 dígitos)" required pattern="[0-9]{10}" title="Escribe 10 números" />
+              <input aria-label="Nombre" v-model="form.nombre" placeholder="Nombre" required />
+              <input aria-label="Email" v-model="form.email" type="email" placeholder="Email" required />
+              <input aria-label="Puesto" v-model="form.puesto" placeholder="Puesto" required />
+              <input aria-label="Teléfono (10 dígitos)" v-model="form.telefono" placeholder="Teléfono (10 dígitos)" required pattern="[0-9]{10}" title="Escribe 10 números" />
             </div>
             <div class="acciones-form">
               <button>{{ editandoId !== null ? 'Guardar cambios' : 'Agregar' }}</button>
               <button v-if="editandoId !== null" type="button" class="gris" @click="cancelar">Cancelar</button>
             </div>
-            <p v-if="error" class="error">{{ error }}</p>
+            <p v-if="error" class="error" role="alert">{{ error }}</p>
           </form>
         </section>
 
         <section class="panel">
           <h2 class="panel-titulo">Candidatos</h2>
           <div class="toolbar">
-            <input v-model="busqueda" class="buscador" placeholder="Buscar por nombre, email o puesto" />
-            <select v-model="filtro">
+            <input aria-label="Buscar por nombre, email o puesto" v-model="busqueda" class="buscador" placeholder="Buscar por nombre, email o puesto" />
+            <select v-model="filtro" aria-label="Filtrar por estado">
               <option value="todos">Todos los estados</option>
               <option value="pendiente">Pendiente</option>
               <option value="contratado">Contratado</option>
@@ -236,6 +237,7 @@ onMounted(cargar)
           </div>
           <div class="tabla-scroll">
             <table>
+              <caption class="solo-lector">Lista de candidatos</caption>
               <thead>
                 <tr>
                   <th>Nombre</th><th>Email</th><th>Puesto</th>
@@ -253,10 +255,10 @@ onMounted(cargar)
                   <td>{{ c.telefono }}</td>
                   <td><span class="estado" :class="c.estado">{{ c.estado }}</span></td>
                   <td v-if="puedeEditar" class="acciones">
-                    <button class="verde" @click="estado(c.id,'contratado')">Contratar</button>
-                    <button class="rojo" @click="estado(c.id,'rechazado')">Rechazar</button>
-                    <button class="gris" @click="editar(c)">Editar</button>
-                    <button v-if="puedeBorrar" class="rojo" @click="borrar(c)">Eliminar</button>
+                    <button class="verde" :aria-label="`Contratar a ${c.nombre}`" @click="estado(c.id,'contratado')">Contratar</button>
+                    <button class="rojo" :aria-label="`Rechazar a ${c.nombre}`" @click="estado(c.id,'rechazado')">Rechazar</button>
+                    <button class="gris" :aria-label="`Editar a ${c.nombre}`" @click="editar(c)">Editar</button>
+                    <button v-if="puedeBorrar" class="rojo" :aria-label="`Eliminar a ${c.nombre}`" @click="borrar(c)">Eliminar</button>
                   </td>
                 </tr>
               </tbody>

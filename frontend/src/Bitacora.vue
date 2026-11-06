@@ -54,7 +54,7 @@ onMounted(cargar)
   <section class="panel">
     <h2 class="panel-titulo">Bitácora de auditoría</h2>
     <div class="toolbar">
-      <input v-model="busqueda" class="buscador" placeholder="Buscar por usuario o detalle" />
+      <input aria-label="Buscar por usuario o detalle" v-model="busqueda" class="buscador" placeholder="Buscar por usuario o detalle" />
       <select v-model="tipo">
         <option value="todas">Todas las acciones</option>
         <option v-for="(n, k) in etiquetas" :key="k" :value="k">{{ n }}</option>

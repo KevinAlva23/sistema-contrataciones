@@ -39,15 +39,15 @@ async function cambiar() {
     <h2 class="panel-titulo">Mi cuenta: {{ usuario }}</h2>
     <form class="panel-cuerpo" @submit.prevent="cambiar">
       <div style="display: flex; flex-direction: column; gap: 10px">
-        <input v-model="f.actual" type="password" placeholder="Contraseña actual" required autocomplete="current-password" />
-        <input v-model="f.nueva" type="password" placeholder="Contraseña nueva" required minlength="10" autocomplete="new-password" />
-        <input v-model="f.repetir" type="password" placeholder="Repetir contraseña nueva" required minlength="10" autocomplete="new-password" />
+        <input aria-label="Contraseña actual" v-model="f.actual" type="password" placeholder="Contraseña actual" required autocomplete="current-password" />
+        <input aria-label="Contraseña nueva" v-model="f.nueva" type="password" placeholder="Contraseña nueva" required minlength="10" autocomplete="new-password" />
+        <input aria-label="Repetir contraseña nueva" v-model="f.repetir" type="password" placeholder="Repetir contraseña nueva" required minlength="10" autocomplete="new-password" />
         <small style="color: var(--suave)">
           Mínimo 10 caracteres, con mayúscula, minúscula y número.
         </small>
         <button>Cambiar contraseña</button>
       </div>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="ok" style="color: var(--verde); font-weight: 600">{{ ok }}</p>
     </form>
   </section>

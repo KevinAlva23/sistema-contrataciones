@@ -83,8 +83,8 @@ onMounted(cargar)
     <h2 class="panel-titulo">Nuevo usuario</h2>
     <form class="panel-cuerpo" @submit.prevent="crear">
       <div class="grid-form">
-        <input v-model="nuevo.username" placeholder="Usuario" required />
-        <input v-model="nuevo.password" type="password" placeholder="Contraseña (mín. 10)" required minlength="10" />
+        <input aria-label="Usuario" v-model="nuevo.username" placeholder="Usuario" required />
+        <input aria-label="Contraseña (mín. 10)" v-model="nuevo.password" type="password" placeholder="Contraseña (mín. 10)" required minlength="10" />
         <select v-model="nuevo.rol">
           <option value="admin">admin</option>
           <option value="reclutador">reclutador</option>
@@ -95,7 +95,7 @@ onMounted(cargar)
     </form>
   </section>
 
-  <p v-if="error" class="error">{{ error }}</p>
+  <p v-if="error" class="error" role="alert">{{ error }}</p>
 
   <section class="panel">
     <h2 class="panel-titulo">Usuarios ({{ usuarios.length }})</h2>
