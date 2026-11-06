@@ -81,6 +81,15 @@ Alternativa con compose (no usar a la vez que el script):
 - Cada usuario puede cambiar la suya en la pestaña **Mi cuenta**.
 - El admin puede restablecer la de otros en la pestaña **Usuarios**.
 
+## Accesibilidad
+- Se puede usar solo con teclado (Tab, Enter) y tiene enlace para saltar al contenido.
+- Foco visible, etiquetas para lectores de pantalla y mensajes de error anunciados.
+- Modo oscuro automático según la configuración del sistema.
+- Respeta la preferencia de movimiento reducido.
+- Exportación a CSV (admin y auditor)
+- Estadísticas por estado, puesto y mes
+- Modo oscuro y navegación por teclado
+
 ## Funciones
 - Inicio de sesión con roles (admin, reclutador, auditor)
 - Alta y edición de candidatos con validación en pantalla y en el backend
@@ -139,6 +148,14 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
     podman logs -f frontend    # logs del frontend
 
 ## Historial de cambios
+
+### v1.18 - Accesibilidad y modo oscuro
+- Modo oscuro automático según la configuración del sistema
+- Navegación completa por teclado y enlace "Saltar al contenido"
+- Foco visible y etiquetas ARIA en campos y botones
+- Botones que indican a quién afectan (por ejemplo, "Contratar a Ana")
+- Errores anunciados a lectores de pantalla
+- Respeta la preferencia de reducir movimiento
 
 ### v1.17 - Endurecimiento
 - Cabeceras de seguridad en Nginx (CSP, X-Frame-Options, nosniff)
