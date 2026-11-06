@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import Usuarios from './Usuarios.vue'
 import Bitacora from './Bitacora.vue'
 import Estadisticas from './Estadisticas.vue'
@@ -77,6 +77,41 @@ const filtrados = computed(() => {
     return okEstado && okTexto
   })
 })
+
+const orden = ref({ campo: 'id', asc: true })
+const pagina = ref(1)
+const porPagina = ref(10)
+
+function ordenar(campo) {
+  if (orden.value.campo === campo) orden.value.asc = !orden.value.asc
+  else orden.value = { campo, asc: true }
+  pagina.value = 1
+}
+const flecha = (campo) => orden.value.campo === campo ? (orden.value.asc ? '▲' : '▼') : ''
+const ariaOrden = (campo) =>
+  orden.value.campo !== campo ? 'none' : (orden.value.asc ? 'ascending' : 'descending')
+
+const ordenados = computed(() => {
+  const { campo, asc } = orden.value
+  const lista = [...filtrados.value]
+  lista.sort((a, b) => {
+    const x = a[campo], y = b[campo]
+    const r = typeof x === 'number'
+      ? x - y
+      : String(x ?? '').localeCompare(String(y ?? ''), 'es', { sensitivity: 'base' })
+    return asc ? r : -r
+  })
+  return lista
+})
+
+const totalPaginas = computed(() => Math.max(1, Math.ceil(filtrados.value.length / porPagina.value)))
+const visibles = computed(() => {
+  const ini = (Math.min(pagina.value, totalPaginas.value) - 1) * porPagina.value
+  return ordenados.value.slice(ini, ini + porPagina.value)
+})
+
+// Al buscar, filtrar o cambiar el tamaño de página, vuelve a la primera
+watch([busqueda, filtro, porPagina], () => { pagina.value = 1 })
 
 async function cargar() {
   if (!token.value) return
@@ -240,15 +275,15 @@ onMounted(cargar)
               <caption class="solo-lector">Lista de candidatos</caption>
               <thead>
                 <tr>
-                  <th>Nombre</th><th>Email</th><th>Puesto</th>
-                  <th>Teléfono</th><th>Estado</th><th v-if="puedeEditar">Acciones</th>
+                  <th :aria-sort="ariaOrden('nombre')"><button class="th-btn" @click="ordenar('nombre')">Nombre {{ flecha('nombre') }}</button></th><th :aria-sort="ariaOrden('email')"><button class="th-btn" @click="ordenar('email')">Email {{ flecha('email') }}</button></th><th :aria-sort="ariaOrden('puesto')"><button class="th-btn" @click="ordenar('puesto')">Puesto {{ flecha('puesto') }}</button></th>
+                  <th :aria-sort="ariaOrden('telefono')"><button class="th-btn" @click="ordenar('telefono')">Teléfono {{ flecha('telefono') }}</button></th><th :aria-sort="ariaOrden('estado')"><button class="th-btn" @click="ordenar('estado')">Estado {{ flecha('estado') }}</button></th><th v-if="puedeEditar">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!filtrados.length">
                   <td colspan="6" class="vacio">Sin resultados</td>
                 </tr>
-                <tr v-for="c in filtrados" :key="c.id">
+                <tr v-for="c in visibles" :key="c.id">
                   <td>{{ c.nombre }}</td>
                   <td>{{ c.email }}</td>
                   <td>{{ c.puesto }}</td>
@@ -263,6 +298,16 @@ onMounted(cargar)
                 </tr>
               </tbody>
             </table>
+            <nav class="paginacion" aria-label="Paginación">
+              <button class="gris" :disabled="pagina <= 1" @click="pagina--">Anterior</button>
+              <span>Página {{ Math.min(pagina, totalPaginas) }} de {{ totalPaginas }}</span>
+              <button class="gris" :disabled="pagina >= totalPaginas" @click="pagina++">Siguiente</button>
+              <select v-model.number="porPagina" aria-label="Filas por página">
+                <option :value="10">10 por página</option>
+                <option :value="25">25 por página</option>
+                <option :value="50">50 por página</option>
+              </select>
+            </nav>
           </div>
         </section>
       </template>
