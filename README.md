@@ -125,6 +125,35 @@ Documentación interactiva en http://localhost:8080/api/docs
 - `.github/workflows/tests.yml`: pruebas automáticas
 - `.env`: secretos locales (no se sube)
 
+## Publicar el sistema real
+
+Por defecto el sistema solo se usa en el equipo (`http://localhost:8080`). Para acceder desde otro lugar se puede abrir un túnel de Cloudflare (gratis, con HTTPS, sin abrir puertos del router).
+
+Instalar `cloudflared` sin permisos de administrador:
+
+    mkdir -p ~/.local/bin
+    curl -L -C - --retry 10 -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+    chmod +x ~/.local/bin/cloudflared
+
+Abrir el túnel:
+
+    ~/.local/bin/cloudflared tunnel --url http://localhost:8080
+
+En segundo plano:
+
+    nohup ~/.local/bin/cloudflared tunnel --url http://localhost:8080 > ~/tunel.log 2>&1 &
+    grep -o "https://[a-z0-9-]*\.trycloudflare\.com" ~/tunel.log | head -1    # ver la dirección
+    pkill cloudflared                                                         # apagar
+
+La dirección cambia cada vez y solo funciona mientras el equipo esté encendido y con internet. Es un servicio pensado para pruebas, sin garantía de disponibilidad.
+
+### Antes de publicar
+- Cambia la contraseña del administrador desde **Mi cuenta** (mínimo 10 caracteres, con mayúscula, minúscula y número).
+- Desactiva los usuarios que no uses desde la pestaña **Usuarios**.
+- Usa una `SECRET_KEY` larga y aleatoria en `.env`.
+- Revisa la **Bitácora** con frecuencia (intentos fallidos e inicios de sesión extraños).
+- Haz respaldos con `./respaldo.sh`.
+
 ## Respaldos
 
     ./respaldo.sh                      # crea un respaldo con fecha
@@ -148,6 +177,16 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
     podman logs -f frontend    # logs del frontend
 
 ## Historial de cambios
+
+### v1.20 - Publicación del sistema
+- Instrucciones para exponer el sistema con Cloudflare Tunnel (HTTPS, sin abrir puertos)
+- Túnel en segundo plano con `nohup` y apagado con `pkill`
+- Recomendaciones de seguridad antes de publicar
+
+### v1.19 - Orden y paginación
+- Ordenar la tabla por nombre, email, puesto, teléfono o estado
+- Paginación de 10, 25 o 50 filas
+- Encabezados accesibles con teclado y lectores de pantalla
 
 ### v1.18 - Accesibilidad y modo oscuro
 - Modo oscuro automático según la configuración del sistema
