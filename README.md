@@ -178,6 +178,11 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.21 - Estados y notas
+- Nuevos estados: en entrevista y oferta enviada
+- Notas de seguimiento por candidato
+- Filtro y estadísticas con los estados nuevos
+
 ### v1.20 - Publicación del sistema
 - Instrucciones para exponer el sistema con Cloudflare Tunnel (HTTPS, sin abrir puertos)
 - Túnel en segundo plano con `nohup` y apagado con `pkill`

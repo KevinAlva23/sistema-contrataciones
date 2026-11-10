@@ -14,6 +14,7 @@ from sqlmodel import SQLModel, Field, Session, create_engine, select
 
 SECRET = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 ROLES = ("admin", "reclutador", "auditor")
+ESTADOS = ("pendiente", "en_entrevista", "oferta_enviada", "contratado", "rechazado")
 
 # Bloqueo tras intentos fallidos: usuario -> (fallos, bloqueado_hasta)
 INTENTOS = {}
@@ -29,6 +30,7 @@ class Candidato(SQLModel, table=True):
     telefono: str
     estado: str = "pendiente"
     creado: Optional[str] = None
+    notas: str = ""
 
 
 class Usuario(SQLModel, table=True):
@@ -71,6 +73,8 @@ SQLModel.metadata.create_all(engine)
 with engine.begin() as _c:
     from sqlalchemy import text as _text
     _cols = [r[1] for r in _c.execute(_text("PRAGMA table_info(candidato)"))]
+    if "notas" not in _cols:
+        _c.execute(_text("ALTER TABLE candidato ADD COLUMN notas VARCHAR DEFAULT ''"))
     if "creado" not in _cols:
         _c.execute(_text("ALTER TABLE candidato ADD COLUMN creado VARCHAR"))
 
@@ -380,7 +384,7 @@ def crear(c: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))):
 def cambiar_estado(
     id: int, estado: str, yo: Usuario = Depends(requiere("admin", "reclutador"))
 ):
-    if estado not in ("pendiente", "contratado", "rechazado"):
+    if estado not in ESTADOS:
         raise HTTPException(400, "Estado inválido")
     with Session(engine) as s:
         c = s.get(Candidato, id)
@@ -408,6 +412,7 @@ def editar(
         c.email = datos.email
         c.puesto = datos.puesto
         c.telefono = datos.telefono
+        c.notas = datos.notas
         s.add(c)
         registrar(s, yo.username, "candidato_editado", f"{c.nombre} (id {c.id})")
         s.commit()

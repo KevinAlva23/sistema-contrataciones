@@ -15,7 +15,7 @@ const vista = ref('candidatos')
 const candidatos = ref([])
 const filtro = ref('todos')
 const busqueda = ref('')
-const form = ref({ nombre: '', email: '', puesto: '', telefono: '' })
+const form = ref({ nombre: '', email: '', puesto: '', telefono: '', notas: '' })
 const editandoId = ref(null)
 const error = ref('')
 
@@ -142,13 +142,13 @@ async function guardar() {
 }
 
 function editar(c) {
-  form.value = { nombre: c.nombre, email: c.email, puesto: c.puesto, telefono: c.telefono }
+  form.value = { nombre: c.nombre, email: c.email, puesto: c.puesto, telefono: c.telefono, notas: c.notas || '' }
   editandoId.value = c.id
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function cancelar() {
-  form.value = { nombre: '', email: '', puesto: '', telefono: '' }
+  form.value = { nombre: '', email: '', puesto: '', telefono: '', notas: '' }
   editandoId.value = null
 }
 
@@ -249,6 +249,7 @@ onMounted(cargar)
               <input aria-label="Puesto" v-model="form.puesto" placeholder="Puesto" required />
               <input aria-label="Teléfono (10 dígitos)" v-model="form.telefono" placeholder="Teléfono (10 dígitos)" required pattern="[0-9]{10}" title="Escribe 10 números" />
             </div>
+            <textarea v-if="editandoId !== null" v-model="form.notas" aria-label="Notas" placeholder="Notas de entrevista o seguimiento" rows="3" style="width:100%;margin-top:10px"></textarea>
             <div class="acciones-form">
               <button>{{ editandoId !== null ? 'Guardar cambios' : 'Agregar' }}</button>
               <button v-if="editandoId !== null" type="button" class="gris" @click="cancelar">Cancelar</button>
@@ -264,6 +265,8 @@ onMounted(cargar)
             <select v-model="filtro" aria-label="Filtrar por estado">
               <option value="todos">Todos los estados</option>
               <option value="pendiente">Pendiente</option>
+              <option value="en_entrevista">En entrevista</option>
+              <option value="oferta_enviada">Oferta enviada</option>
               <option value="contratado">Contratado</option>
               <option value="rechazado">Rechazado</option>
             </select>
@@ -288,8 +291,10 @@ onMounted(cargar)
                   <td>{{ c.email }}</td>
                   <td>{{ c.puesto }}</td>
                   <td>{{ c.telefono }}</td>
-                  <td><span class="estado" :class="c.estado">{{ c.estado }}</span></td>
+                  <td><span class="estado" :class="c.estado">{{ c.estado.replace('_', ' ') }}</span></td>
                   <td v-if="puedeEditar" class="acciones">
+                    <button class="gris" :aria-label="`Pasar a entrevista a ${c.nombre}`" @click="estado(c.id,'en_entrevista')">Entrevista</button>
+                    <button class="gris" :aria-label="`Enviar oferta a ${c.nombre}`" @click="estado(c.id,'oferta_enviada')">Oferta</button>
                     <button class="verde" :aria-label="`Contratar a ${c.nombre}`" @click="estado(c.id,'contratado')">Contratar</button>
                     <button class="rojo" :aria-label="`Rechazar a ${c.nombre}`" @click="estado(c.id,'rechazado')">Rechazar</button>
                     <button class="gris" :aria-label="`Editar a ${c.nombre}`" @click="editar(c)">Editar</button>

@@ -149,3 +149,15 @@ def test_estadisticas(client, admin, auditor, reclutador):
     assert d["total"] >= 1
     assert "por_estado" in d and "por_puesto" in d and "por_mes" in d
     assert client.get("/estadisticas", headers=reclutador).status_code == 403
+
+
+# ---------- Estados nuevos y notas ----------
+def test_estados_nuevos_y_notas(client, admin):
+    nuevo = client.post("/candidatos", headers=admin, json=candidato()).json()
+    for e in ("en_entrevista", "oferta_enviada"):
+        r = client.patch(f"/candidatos/{nuevo['id']}?estado={e}", headers=admin)
+        assert r.status_code == 200 and r.json()["estado"] == e
+    datos = {**candidato(), "notas": "Buena entrevista"}
+    datos["email"] = nuevo["email"]
+    r = client.put(f"/candidatos/{nuevo['id']}", headers=admin, json=datos)
+    assert r.status_code == 200 and r.json()["notas"] == "Buena entrevista"

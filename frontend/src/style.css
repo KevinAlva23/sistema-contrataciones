@@ -302,3 +302,18 @@ body { font-size: 16px; line-height: 1.45; }
 }
 .paginacion select { width: auto; }
 .paginacion button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ============ ESTADOS NUEVOS ============ */
+.estado.en_entrevista { background: #dbeafe; color: #1e3a8a; }
+.estado.oferta_enviada { background: #ede9fe; color: #4c1d95; }
+.barra.en_entrevista { background: #3b82f6; }
+.barra.oferta_enviada { background: #8b5cf6; }
+textarea {
+  padding: 9px 11px; border: 1px solid var(--borde); border-radius: 8px;
+  font: inherit; background: white; color: var(--texto);
+}
+@media (prefers-color-scheme: dark) {
+  textarea { background: #17211b; color: var(--texto); }
+  .estado.en_entrevista { background: #1e3a6e; color: #cfe0ff; }
+  .estado.oferta_enviada { background: #3b2a6e; color: #e0d4ff; }
+}
