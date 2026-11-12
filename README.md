@@ -178,6 +178,17 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.23 - PostgreSQL y Alembic
+- Base de datos PostgreSQL en su propio contenedor (tres contenedores)
+- Migraciones con Alembic en lugar de ALTER TABLE manual
+- Respaldos con pg_dump en `respaldo.sh`
+- El frontend escucha solo en 127.0.0.1
+
+### v1.22 - Embudo y seguimiento
+- Embudo de selección por etapas (pendiente, entrevista, oferta, contratado)
+- Aviso de candidatos que llevan más de 7 días sin avanzar
+- Columna de días desde el registro
+
 ### v1.21 - Estados y notas
 - Nuevos estados: en entrevista y oferta enviada
 - Notas de seguimiento por candidato
