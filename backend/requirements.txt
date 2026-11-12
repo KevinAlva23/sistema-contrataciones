@@ -3,3 +3,5 @@ uvicorn[standard]
 sqlmodel
 pyjwt
 bcrypt
+psycopg2-binary
+alembic

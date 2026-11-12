@@ -67,10 +67,13 @@ class CambioUsuario(SQLModel):
 
 
 engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:////data/contrataciones.db"))
-SQLModel.metadata.create_all(engine)
+# ALEMBIC: en PostgreSQL las tablas las gestionan las migraciones
+if engine.dialect.name == "sqlite":
+    SQLModel.metadata.create_all(engine)
 
 # Migración sencilla: agrega la columna "creado" a bases anteriores
-with engine.begin() as _c:
+with (engine.begin() if engine.dialect.name == "sqlite" else open("/dev/null")) as _c:
+  if engine.dialect.name == "sqlite":
     from sqlalchemy import text as _text
     _cols = [r[1] for r in _c.execute(_text("PRAGMA table_info(candidato)"))]
     if "notas" not in _cols:
@@ -115,7 +118,9 @@ def registrar(s, quien, accion, detalle=""):
 
 # Primer administrador si todavía no existe ningún usuario
 with Session(engine) as s:
-    if not s.exec(select(Usuario)).first():
+    if os.environ.get("SOLO_MODELOS"):
+        pass
+    elif not s.exec(select(Usuario)).first():
         clave = os.environ.get("ADMIN_PASSWORD")
         if clave:
             s.add(Usuario(
