@@ -178,6 +178,11 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.24 - Pulido visual
+- Avisos flotantes al guardar, cambiar estado o eliminar
+- Avatares con iniciales
+- Vista alternable de tabla o tarjetas
+
 ### v1.23 - PostgreSQL y Alembic
 - Base de datos PostgreSQL en su propio contenedor (tres contenedores)
 - Migraciones con Alembic en lugar de ALTER TABLE manual
