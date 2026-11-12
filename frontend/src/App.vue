@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import Usuarios from './Usuarios.vue'
+import Toast from './Toast.vue'
+import { notify } from './toast.js'
 import Bitacora from './Bitacora.vue'
 import Estadisticas from './Estadisticas.vue'
 import MiCuenta from './MiCuenta.vue'
@@ -18,6 +20,11 @@ const busqueda = ref('')
 const form = ref({ nombre: '', email: '', puesto: '', telefono: '', notas: '' })
 const editandoId = ref(null)
 const error = ref('')
+const lista = ref(localStorage.getItem('lista') || 'tabla')
+function setLista(v) { lista.value = v; localStorage.setItem('lista', v) }
+const ini = (n) => n.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()
+const colores = ['#0b7a3e', '#2563eb', '#7c3aed', '#c2410c', '#0f766e', '#be185d', '#a16207']
+const colorDe = (n) => colores[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % colores.length]
 
 const puedeEditar = computed(() => ['admin', 'reclutador'].includes(rol.value))
 const puedeBorrar = computed(() => rol.value === 'admin')
@@ -136,6 +143,7 @@ async function guardar() {
       return
     }
     error.value = ''
+    notify(editando ? 'Cambios guardados' : 'Candidato agregado')
     cancelar()
     cargar()
   } catch (e) {}
@@ -153,12 +161,12 @@ function cancelar() {
 }
 
 async function estado(id, e) {
-  try { await api(`/api/candidatos/${id}?estado=${e}`, { method: 'PATCH' }); cargar() } catch (x) {}
+  try { await api(`/api/candidatos/${id}?estado=${e}`, { method: 'PATCH' }); notify('Estado actualizado'); cargar() } catch (x) {}
 }
 
 async function borrar(c) {
   if (!confirm(`¿Eliminar a ${c.nombre}? Esta acción no se puede deshacer.`)) return
-  try { await api(`/api/candidatos/${c.id}`, { method: 'DELETE' }); cargar() } catch (x) {}
+  try { await api(`/api/candidatos/${c.id}`, { method: 'DELETE' }); notify('Candidato eliminado'); cargar() } catch (x) {}
 }
 
 async function exportar() {
@@ -271,9 +279,30 @@ onMounted(cargar)
               <option value="rechazado">Rechazado</option>
             </select>
             <span class="cuenta">{{ filtrados.length }} resultado(s)</span>
+            <span class="vista-botones" role="group" aria-label="Tipo de vista">
+              <button :aria-pressed="lista === 'tabla'" @click="setLista('tabla')">Tabla</button>
+              <button :aria-pressed="lista === 'tarjetas'" @click="setLista('tarjetas')">Tarjetas</button>
+            </span>
             <button v-if="puedeBitacora" class="gris" @click="exportar">Exportar CSV</button>
           </div>
-          <div class="tabla-scroll">
+          <div v-if="lista === 'tarjetas'" class="tarjetas">
+            <p v-if="!filtrados.length" class="vacio">Sin resultados</p>
+            <article v-for="c in filtrados" :key="c.id" class="cand">
+              <header>
+                <span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>
+                <h3>{{ c.nombre }}</h3>
+              </header>
+              <span>{{ c.puesto }}</span>
+              <small>{{ c.email }} · {{ c.telefono }}</small>
+              <span class="estado" :class="c.estado">{{ c.estado.replace('_', ' ') }}</span>
+              <div v-if="puedeEditar" class="acciones">
+                <button class="verde" :aria-label="`Contratar a ${c.nombre}`" @click="estado(c.id,'contratado')">Contratar</button>
+                <button class="rojo" :aria-label="`Rechazar a ${c.nombre}`" @click="estado(c.id,'rechazado')">Rechazar</button>
+                <button class="gris" :aria-label="`Editar a ${c.nombre}`" @click="editar(c)">Editar</button>
+              </div>
+            </article>
+          </div>
+          <div v-else class="tabla-scroll">
             <table>
               <caption class="solo-lector">Lista de candidatos</caption>
               <thead>
@@ -287,7 +316,7 @@ onMounted(cargar)
                   <td colspan="6" class="vacio">Sin resultados</td>
                 </tr>
                 <tr v-for="c in visibles" :key="c.id">
-                  <td>{{ c.nombre }}</td>
+                  <td><div class="celda-nombre"><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>{{ c.nombre }}</div></td>
                   <td>{{ c.email }}</td>
                   <td>{{ c.puesto }}</td>
                   <td>{{ c.telefono }}</td>
@@ -330,5 +359,6 @@ onMounted(cargar)
     </template>
   </main>
 
+  <Toast />
   <footer class="pie">Sistema de Contrataciones · Recursos Humanos</footer>
 </template>

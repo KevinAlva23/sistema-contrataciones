@@ -317,3 +317,35 @@ textarea {
   .estado.en_entrevista { background: #1e3a6e; color: #cfe0ff; }
   .estado.oferta_enviada { background: #3b2a6e; color: #e0d4ff; }
 }
+
+/* ============ AVISOS ============ */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 50;
+  display: flex; flex-direction: column; gap: 8px; }
+.toast { background: var(--verde-oscuro); color: #fff; padding: 11px 16px;
+  border-radius: 10px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  border-left: 5px solid var(--dorado); animation: entra .2s ease-out; }
+.toast.error { background: var(--rojo); }
+@keyframes entra { from { transform: translateY(8px); opacity: 0; } }
+
+/* ============ AVATARES ============ */
+.avatar { display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%; color: #fff;
+  font-size: .8rem; font-weight: 700; margin-right: 10px; flex-shrink: 0; }
+.celda-nombre { display: flex; align-items: center; }
+
+/* ============ VISTA TARJETAS ============ */
+.vista-botones { display: inline-flex; gap: 4px; }
+.vista-botones button { background: var(--gris); color: var(--texto); border: 1px solid var(--borde); }
+.vista-botones button[aria-pressed="true"] { background: var(--verde); color: #fff; border-color: var(--verde); }
+.tarjetas { display: grid; gap: 14px; padding: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.cand { border: 1px solid var(--borde); border-radius: 12px; padding: 14px;
+  background: var(--gris); display: flex; flex-direction: column; gap: 6px; }
+.cand header { display: flex; align-items: center; }
+.cand h3 { margin: 0; font-size: 1rem; }
+.cand small { color: var(--suave); word-break: break-all; }
+.cand .acciones { margin-top: 8px; }
+@media (prefers-color-scheme: dark) {
+  .cand { background: #1b2620; }
+  .vista-botones button { background: #17211b; }
+}
