@@ -56,6 +56,53 @@ function atajos(e) {
 onMounted(() => window.addEventListener('keydown', atajos))
 onUnmounted(() => window.removeEventListener('keydown', atajos))
 
+const tema = ref(localStorage.getItem('tema') || '')
+function aplicarTema() {
+  document.documentElement.classList.toggle('tema-oscuro', tema.value === 'oscuro')
+}
+function alternarTema() {
+  tema.value = tema.value === 'oscuro' ? 'claro' : 'oscuro'
+  localStorage.setItem('tema', tema.value)
+  aplicarTema()
+}
+onMounted(aplicarTema)
+const compacto = ref(localStorage.getItem('compacto') === '1')
+function alternarCompacto() {
+  compacto.value = !compacto.value
+  localStorage.setItem('compacto', compacto.value ? '1' : '0')
+  document.documentElement.classList.toggle('compacto', compacto.value)
+}
+onMounted(() => document.documentElement.classList.toggle('compacto', compacto.value))
+
+// Aviso 10 minutos antes de que caduque el token
+let avisoSesion = null
+function vigilarSesion() {
+  clearTimeout(avisoSesion)
+  try {
+    const exp = JSON.parse(atob(token.value.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000
+    const falta = exp - Date.now() - 10 * 60 * 1000
+    if (falta > 0) avisoSesion = setTimeout(() => notify('Tu sesión caduca en 10 minutos', 'error'), falta)
+  } catch (e) {}
+}
+watch(token, () => { if (token.value) vigilarSesion() })
+onMounted(() => { if (token.value) vigilarSesion() })
+async function importar(ev) {
+  const f = ev.target.files[0]
+  ev.target.value = ''
+  if (!f) return
+  try {
+    const r = await api('/api/candidatos/importar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contenido: await f.text() })
+    })
+    const d = await r.json()
+    if (!r.ok) { notify(d.detail || 'No se pudo importar', 'error'); return }
+    notify(`Importados: ${d.creados}. Con error: ${d.errores.length}`)
+    if (d.errores.length) error.value = d.errores.join(' · ')
+    cargar()
+  } catch (e) {}
+}
 const ini = (n) => n.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()
 const colores = ['#0b7a3e', '#2563eb', '#7c3aed', '#c2410c', '#0f766e', '#be185d', '#a16207']
 const colorDe = (n) => colores[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % colores.length]
@@ -227,7 +274,9 @@ onMounted(cargar)
         Sistema de Contrataciones
         <small>Recursos Humanos</small>
       </div>
-      <div v-if="token" class="sesion">
+      <div class="sesion">
+        <button class="borde" :aria-pressed="tema === 'oscuro'" @click="alternarTema">Tema</button>
+        <template v-if="token">
         <span class="usuario">{{ usuario }}</span>
         <span class="rol" :class="rol">{{ rol }}</span>
         <button class="borde" @click="salir">Cerrar sesión</button>
@@ -314,11 +363,15 @@ onMounted(cargar)
             </select>
             <span class="cuenta">{{ filtrados.length }} resultado(s)</span>
             <span class="vista-botones" role="group" aria-label="Tipo de vista">
+              <button :aria-pressed="compacto" @click="alternarCompacto">Compacto</button>
               <button :aria-pressed="lista === 'tabla'" @click="setLista('tabla')">Tabla</button>
               <button :aria-pressed="lista === 'tarjetas'" @click="setLista('tarjetas')">Tarjetas</button>
               <button :aria-pressed="lista === 'kanban'" @click="setLista('kanban')">Tablero</button>
             </span>
             <button v-if="puedeBitacora" class="gris" @click="exportar">Exportar CSV</button>
+            <label v-if="rol === 'admin'" class="gris boton-archivo">Importar CSV
+              <input type="file" accept=".csv,text/csv" class="solo-lector" @change="importar" aria-label="Importar candidatos desde CSV" />
+            </label>
           </div>
           <div v-if="lista === 'kanban'" class="kanban">
             <section v-for="e in ESTADOS" :key="e" class="col" :class="{ sobre: sobre === e }"

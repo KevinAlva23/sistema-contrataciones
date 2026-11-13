@@ -161,3 +161,11 @@ def test_estados_nuevos_y_notas(client, admin):
     datos["email"] = nuevo["email"]
     r = client.put(f"/candidatos/{nuevo['id']}", headers=admin, json=datos)
     assert r.status_code == 200 and r.json()["notas"] == "Buena entrevista"
+
+
+def test_importar_csv(client, admin, reclutador):
+    csv_ok = "nombre,email,puesto,telefono\nImp Uno,imp1@mail.com,Dev,5511111111\nMalo,malo@mail.com,Dev,123\n"
+    r = client.post("/candidatos/importar", headers=admin, json={"contenido": csv_ok})
+    assert r.status_code == 200
+    assert r.json()["creados"] == 1 and len(r.json()["errores"]) == 1
+    assert client.post("/candidatos/importar", headers=reclutador, json={"contenido": csv_ok}).status_code == 403

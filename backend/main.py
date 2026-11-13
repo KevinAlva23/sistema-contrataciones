@@ -360,6 +360,43 @@ def exportar_csv(yo: Usuario = Depends(requiere("admin", "auditor"))):
     )
 
 
+class ImportarCSV(SQLModel):
+    contenido: str
+
+
+@app.post("/candidatos/importar")
+def importar_csv(datos: ImportarCSV, yo: Usuario = Depends(requiere("admin"))):
+    if len(datos.contenido) > 500_000:
+        raise HTTPException(413, "Archivo demasiado grande")
+    lector = csv.DictReader(io.StringIO(datos.contenido.lstrip("\ufeff")))
+    creados, errores = 0, []
+    with Session(engine) as s:
+        for n, fila in enumerate(lector, start=2):
+            if n > 501:
+                errores.append("Se procesaron solo las primeras 500 filas")
+                break
+            try:
+                c = Candidato(
+                    nombre=(fila.get("nombre") or "").strip(),
+                    email=(fila.get("email") or "").strip(),
+                    puesto=(fila.get("puesto") or "").strip(),
+                    telefono=(fila.get("telefono") or "").strip(),
+                )
+                if not (c.nombre and c.email and c.puesto):
+                    raise HTTPException(422, "Faltan campos")
+                validar(c, s)
+                c.creado = datetime.now(timezone.utc).isoformat()
+                s.add(c)
+                s.commit()
+                creados += 1
+            except HTTPException as e:
+                s.rollback()
+                errores.append(f"Fila {n}: {e.detail}")
+        registrar(s, yo.username, "importacion", f"Importó {creados} candidatos desde CSV")
+        s.commit()
+    return {"creados": creados, "errores": errores[:20]}
+
+
 @app.get("/candidatos")
 def listar(_: Usuario = Depends(requiere("admin", "reclutador", "auditor"))):
     with Session(engine) as s:

@@ -388,3 +388,36 @@ textarea {
 @media (prefers-color-scheme: dark) {
   .detalle-panel { background: #17211b; }
 }
+
+/* tema-oscuro: activado a mano */
+html.tema-oscuro {
+    --gris: #101814;
+    --borde: #2c3a32;
+    --texto: #e8efe9;
+    --suave: #a9b8ad;
+    --verde-claro: #16301f;
+  }
+  .panel, .stat, .login, input, select, table,
+html.tema-oscuro .nav button, .barra-pista { background: #17211b; color: var(--texto); }
+html.tema-oscuro .barra-pista { background: #0e1511; }
+html.tema-oscuro tbody tr:nth-child(even) { background: #1b2620; }
+html.tema-oscuro tbody tr:hover { background: #2a2a14; }
+html.tema-oscuro .panel-titulo, .login h2 { color: #9fe0b5; }
+html.tema-oscuro .nav button { color: #9fe0b5; }
+html.tema-oscuro .nav button:hover { background: #1f3326; }
+html.tema-oscuro .nav button.activo { background: var(--verde); color: #fff; }
+html.tema-oscuro input::placeholder { color: #8da093; }
+html.tema-oscuro .estado.contratado { background: #1d4a30; color: #bff0d0; }
+html.tema-oscuro .estado.rechazado { background: #5a1b26; color: #ffd0d6; }
+html.tema-oscuro .estado.pendiente { background: #5a4710; color: #ffe9a8; }
+
+
+/* ============ MODO COMPACTO ============ */
+html.compacto th, html.compacto td { padding: 5px 10px; }
+html.compacto .avatar { width: 24px; height: 24px; font-size: .65rem; margin-right: 6px; }
+html.compacto button { min-height: 30px; padding: 5px 10px; }
+
+.boton-archivo { display: inline-flex; align-items: center; padding: 9px 14px;
+  border-radius: 8px; background: #6b7280; color: #fff; font-size: .85rem;
+  font-weight: 600; cursor: pointer; }
+.boton-archivo:focus-within { outline: 3px solid var(--dorado); }
