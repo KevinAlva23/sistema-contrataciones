@@ -368,3 +368,23 @@ textarea {
 @media (prefers-color-scheme: dark) {
   .kcard { background: #17211b; }
 }
+
+/* ============ DETALLE Y ATAJOS ============ */
+.nombre-link { background: none; color: inherit; padding: 0; min-height: 0;
+  font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.nombre-link:hover { background: none; text-decoration: underline; }
+.fondo { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40; }
+.detalle-panel { position: fixed; top: 0; right: 0; height: 100%; width: min(420px, 100%);
+  background: #fff; color: var(--texto); z-index: 41; padding: 1.25rem; overflow-y: auto;
+  box-shadow: -8px 0 24px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 10px; }
+.detalle-panel h2 { margin: 0; display: flex; align-items: center; }
+.detalle-panel dl { margin: 0; display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; }
+.detalle-panel dt { color: var(--suave); }
+.detalle-panel dd { margin: 0; word-break: break-word; }
+.notas-caja { background: var(--gris); border-radius: 8px; padding: 10px; white-space: pre-wrap; }
+.ayuda-atajos { position: fixed; left: 16px; bottom: 16px; z-index: 50; background: var(--verde-oscuro);
+  color: #fff; padding: 12px 16px; border-radius: 10px; font-size: .9rem; }
+.ayuda-atajos kbd { background: #fff; color: #000; border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+@media (prefers-color-scheme: dark) {
+  .detalle-panel { background: #17211b; }
+}

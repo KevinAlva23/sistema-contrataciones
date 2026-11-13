@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import Usuarios from './Usuarios.vue'
 import Toast from './Toast.vue'
 import { notify } from './toast.js'
@@ -31,6 +31,31 @@ function soltar(e) {
   arrastrando.value = null; sobre.value = ''
   if (c && c.estado !== e && puedeEditar.value) estado(c.id, e)
 }
+const detalle = ref(null)
+const ayuda = ref(false)
+const abrir = (c) => { detalle.value = c }
+const cerrar = () => { detalle.value = null }
+const diasDe = (c) => c.creado ? Math.floor((Date.now() - new Date(c.creado).getTime()) / 86400000) : null
+
+function atajos(e) {
+  if (e.key === 'Escape') { cerrar(); ayuda.value = false; return }
+  const campo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
+  if (campo || e.ctrlKey || e.metaKey || e.altKey || !token.value) return
+  if (e.key === '/') {
+    e.preventDefault()
+    vista.value = 'candidatos'
+    nextTick(() => document.querySelector('.buscador')?.focus())
+  } else if (e.key === 'n' && puedeEditar.value) {
+    e.preventDefault()
+    vista.value = 'candidatos'
+    nextTick(() => document.querySelector('.grid-form input')?.focus())
+  } else if (e.key === '?') {
+    ayuda.value = !ayuda.value
+  }
+}
+onMounted(() => window.addEventListener('keydown', atajos))
+onUnmounted(() => window.removeEventListener('keydown', atajos))
+
 const ini = (n) => n.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()
 const colores = ['#0b7a3e', '#2563eb', '#7c3aed', '#c2410c', '#0f766e', '#be185d', '#a16207']
 const colorDe = (n) => colores[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % colores.length]
@@ -302,7 +327,7 @@ onMounted(cargar)
               <h3>{{ e.replace('_', ' ') }} <span class="num">{{ porEstado(e).length }}</span></h3>
               <article v-for="c in porEstado(e)" :key="c.id" class="kcard"
                 :draggable="puedeEditar" @dragstart="arrastrando = c" @dragend="sobre = ''">
-                <b><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>{{ c.nombre }}</b>
+                <b><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></b>
                 <small>{{ c.puesto }}</small>
                 <select v-if="puedeEditar" :aria-label="`Mover a ${c.nombre}`" :value="c.estado"
                   @change="estado(c.id, $event.target.value)">
@@ -316,7 +341,7 @@ onMounted(cargar)
             <article v-for="c in filtrados" :key="c.id" class="cand">
               <header>
                 <span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>
-                <h3>{{ c.nombre }}</h3>
+                <h3><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></h3>
               </header>
               <span>{{ c.puesto }}</span>
               <small>{{ c.email }} · {{ c.telefono }}</small>
@@ -342,7 +367,7 @@ onMounted(cargar)
                   <td colspan="6" class="vacio">Sin resultados</td>
                 </tr>
                 <tr v-for="c in visibles" :key="c.id">
-                  <td><div class="celda-nombre"><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>{{ c.nombre }}</div></td>
+                  <td><div class="celda-nombre"><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></div></td>
                   <td>{{ c.email }}</td>
                   <td>{{ c.puesto }}</td>
                   <td>{{ c.telefono }}</td>
@@ -385,6 +410,38 @@ onMounted(cargar)
     </template>
   </main>
 
+  <template v-if="detalle">
+    <div class="fondo" @click="cerrar"></div>
+    <aside class="detalle-panel" role="dialog" aria-modal="true" aria-label="Detalle del candidato">
+      <h2>
+        <span class="avatar" :style="{ background: colorDe(detalle.nombre) }" aria-hidden="true">{{ ini(detalle.nombre) }}</span>
+        {{ detalle.nombre }}
+      </h2>
+      <span class="estado" :class="detalle.estado">{{ detalle.estado.replace('_', ' ') }}</span>
+      <dl>
+        <dt>Puesto</dt><dd>{{ detalle.puesto }}</dd>
+        <dt>Email</dt><dd>{{ detalle.email }}</dd>
+        <dt>Teléfono</dt><dd>{{ detalle.telefono }}</dd>
+        <dt>Registro</dt><dd>{{ diasDe(detalle) === null ? 'Sin fecha' : 'Hace ' + diasDe(detalle) + ' días' }}</dd>
+      </dl>
+      <h3>Notas</h3>
+      <div class="notas-caja">{{ detalle.notas || 'Sin notas.' }}</div>
+      <div v-if="puedeEditar" class="acciones">
+        <button class="gris" @click="estado(detalle.id,'en_entrevista'); cerrar()">Entrevista</button>
+        <button class="gris" @click="estado(detalle.id,'oferta_enviada'); cerrar()">Oferta</button>
+        <button class="verde" @click="estado(detalle.id,'contratado'); cerrar()">Contratar</button>
+        <button class="rojo" @click="estado(detalle.id,'rechazado'); cerrar()">Rechazar</button>
+        <button class="gris" @click="editar(detalle); cerrar()">Editar</button>
+      </div>
+      <button class="gris" @click="cerrar">Cerrar (Esc)</button>
+    </aside>
+  </template>
+  <div v-if="ayuda" class="ayuda-atajos" role="status">
+    <div><kbd>/</kbd> Buscar</div>
+    <div><kbd>n</kbd> Nuevo candidato</div>
+    <div><kbd>Esc</kbd> Cerrar</div>
+    <div><kbd>?</kbd> Esta ayuda</div>
+  </div>
   <Toast />
   <footer class="pie">Sistema de Contrataciones · Recursos Humanos</footer>
 </template>
