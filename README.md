@@ -1,4 +1,4 @@
-}# Sistema de Contrataciones
+# Sistema de Contrataciones
 
 Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado), con inicio de sesión, roles, bitácora de auditoría y respaldos, ejecutada en contenedores con Podman.
 
@@ -177,6 +177,11 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
     podman logs -f frontend    # logs del frontend
 
 ## Historial de cambios
+
+### v1.27 - Comodidad y datos
+- Tema claro/oscuro manual y modo compacto (se recuerdan)
+- Aviso 10 minutos antes de que caduque la sesión
+- Importación de candidatos desde CSV (admin), con reporte de errores
 
 ### v1.26 - Detalle y atajos
 - Panel lateral de detalle al hacer clic en un candidato
