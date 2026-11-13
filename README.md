@@ -750,11 +750,6 @@ Para mantener el funcionamiento adecuado de la plataforma se recomienda:
 | **Tecnologías principales** | Vue 3, FastAPI, Nginx, SQLite y Podman |
 | **Tipo de aplicación** | Aplicación web de gestión |
 
-### Repositorio oficial
-
-[https://github.com/KevinAlva23/sistema-contrataciones](https://github.com/KevinAlva23/sistema-contrataciones)
-
----
 
 <div align="center">
 
