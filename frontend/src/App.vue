@@ -22,6 +22,15 @@ const editandoId = ref(null)
 const error = ref('')
 const lista = ref(localStorage.getItem('lista') || 'tabla')
 function setLista(v) { lista.value = v; localStorage.setItem('lista', v) }
+const ESTADOS = ['pendiente', 'en_entrevista', 'oferta_enviada', 'contratado', 'rechazado']
+const arrastrando = ref(null)
+const sobre = ref('')
+const porEstado = (e) => filtrados.value.filter(c => c.estado === e)
+function soltar(e) {
+  const c = arrastrando.value
+  arrastrando.value = null; sobre.value = ''
+  if (c && c.estado !== e && puedeEditar.value) estado(c.id, e)
+}
 const ini = (n) => n.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()
 const colores = ['#0b7a3e', '#2563eb', '#7c3aed', '#c2410c', '#0f766e', '#be185d', '#a16207']
 const colorDe = (n) => colores[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % colores.length]
@@ -282,10 +291,27 @@ onMounted(cargar)
             <span class="vista-botones" role="group" aria-label="Tipo de vista">
               <button :aria-pressed="lista === 'tabla'" @click="setLista('tabla')">Tabla</button>
               <button :aria-pressed="lista === 'tarjetas'" @click="setLista('tarjetas')">Tarjetas</button>
+              <button :aria-pressed="lista === 'kanban'" @click="setLista('kanban')">Tablero</button>
             </span>
             <button v-if="puedeBitacora" class="gris" @click="exportar">Exportar CSV</button>
           </div>
-          <div v-if="lista === 'tarjetas'" class="tarjetas">
+          <div v-if="lista === 'kanban'" class="kanban">
+            <section v-for="e in ESTADOS" :key="e" class="col" :class="{ sobre: sobre === e }"
+              :aria-label="e.replace('_', ' ')"
+              @dragover.prevent="sobre = e" @dragleave="sobre = ''" @drop.prevent="soltar(e)">
+              <h3>{{ e.replace('_', ' ') }} <span class="num">{{ porEstado(e).length }}</span></h3>
+              <article v-for="c in porEstado(e)" :key="c.id" class="kcard"
+                :draggable="puedeEditar" @dragstart="arrastrando = c" @dragend="sobre = ''">
+                <b><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>{{ c.nombre }}</b>
+                <small>{{ c.puesto }}</small>
+                <select v-if="puedeEditar" :aria-label="`Mover a ${c.nombre}`" :value="c.estado"
+                  @change="estado(c.id, $event.target.value)">
+                  <option v-for="x in ESTADOS" :key="x" :value="x">{{ x.replace('_', ' ') }}</option>
+                </select>
+              </article>
+            </section>
+          </div>
+          <div v-else-if="lista === 'tarjetas'" class="tarjetas">
             <p v-if="!filtrados.length" class="vacio">Sin resultados</p>
             <article v-for="c in filtrados" :key="c.id" class="cand">
               <header>

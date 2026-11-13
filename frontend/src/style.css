@@ -349,3 +349,22 @@ textarea {
   .cand { background: #1b2620; }
   .vista-botones button { background: #17211b; }
 }
+
+/* ============ KANBAN ============ */
+.kanban { display: grid; gap: 12px; padding: 1rem; overflow-x: auto;
+  grid-template-columns: repeat(5, minmax(210px, 1fr)); }
+.col { background: var(--gris); border: 1px solid var(--borde); border-radius: 12px;
+  padding: 10px; min-height: 140px; display: flex; flex-direction: column; gap: 8px; }
+.col.sobre { outline: 3px dashed var(--dorado); }
+.col h3 { margin: 0 0 4px; font-size: .9rem; display: flex; justify-content: space-between;
+  text-transform: capitalize; }
+.col .num { background: var(--borde); border-radius: 999px; padding: 0 9px; font-size: .8rem; }
+.kcard { background: #fff; border: 1px solid var(--borde); border-radius: 10px;
+  padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.kcard[draggable="true"] { cursor: grab; }
+.kcard b { display: flex; align-items: center; }
+.kcard small { color: var(--suave); }
+.kcard select { font-size: .8rem; padding: 4px 6px; }
+@media (prefers-color-scheme: dark) {
+  .kcard { background: #17211b; }
+}
