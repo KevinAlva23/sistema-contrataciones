@@ -178,6 +178,11 @@ GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
 
 ## Historial de cambios
 
+### v1.25 - Tablero
+- Vista de tablero por estado con arrastrar y soltar
+- Selector de "MOver a" accesible por teclado y en celular}
+- Solo admin y reclutador pueden mover candidatos
+
 ### v1.24 - Pulido visual
 - Avisos flotantes al guardar, cambiar estado o eliminar
 - Avatares con iniciales
