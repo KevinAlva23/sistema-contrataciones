@@ -1,302 +1,425 @@
-# Sistema de Contrataciones
+# SISTEMA DE CONTRATACIONES
 
-Aplicación web para gestionar candidatos (nombre, correo, puesto, teléfono y estado), con inicio de sesión, roles, bitácora de auditoría y respaldos, ejecutada en contenedores con Podman.
+### Plataforma de gestión y seguimiento de procesos de contratación
 
-## Tecnologías
-- Frontend: Vue 3 + Vite, servido con Nginx
-- Backend: FastAPI (Python) + SQLModel
-- Base de datos: SQLite (volumen persistente)
-- Seguridad: contraseñas con bcrypt y sesiones JWT
-- Pruebas: pytest y GitHub Actions
-- Contenedores: Podman (también compatible con Docker)
+**Sistema web para administrar vacantes, candidatos y procesos de selección desde una plataforma centralizada.**
 
-## Arquitectura
+---
+
+<p align="center">
+
+**TECNOLOGÍA · ADMINISTRACIÓN · CONTROL · TRANSPARENCIA**
+
+</p>
+
+<p align="center">
+
+![Estado](https://img.shields.io/badge/Estado-En%20desarrollo-blue?style=flat-square)
+![Versión](https://img.shields.io/badge/Versión-1.27-163A5F?style=flat-square)
+![Frontend](https://img.shields.io/badge/Frontend-Vue.js-42B883?style=flat-square)
+![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square)
+![Base de datos](https://img.shields.io/badge/Base%20de%20datos-SQLite-003B57?style=flat-square)
+![Licencia](https://img.shields.io/badge/Licencia-Por%20definir-lightgrey?style=flat-square)
+
+</p>
+
+---
+
+## 1. Descripción general
+
+El **Sistema de Contrataciones** es una aplicación web diseñada para facilitar la administración, organización y seguimiento de los procesos de contratación.
+
+La plataforma permite centralizar la información relacionada con vacantes, candidatos, usuarios y actividades administrativas, proporcionando herramientas para mejorar el control de los procesos y mantener un registro de las operaciones realizadas.
+
+El sistema cuenta con una arquitectura cliente-servidor, mecanismos de autenticación, administración de permisos y herramientas de seguimiento que permiten gestionar las actividades de acuerdo con el perfil de cada usuario.
+
+Su desarrollo está orientado a ofrecer una solución funcional, organizada y adaptable a las necesidades de gestión de personal.
+
+## 2. Objetivos del proyecto
+
+### Objetivo general
+
+Desarrollar una plataforma web que permita administrar y dar seguimiento a los procesos de contratación mediante herramientas digitales que faciliten la organización de la información, el control de actividades y la gestión de usuarios.
+
+### Objetivos específicos
+
+- Centralizar la información de vacantes y candidatos.
+- Facilitar la administración de los procesos de contratación.
+- Implementar autenticación y control de acceso por roles.
+- Mantener registros de las actividades realizadas dentro del sistema.
+- Generar información estadística para apoyar el seguimiento de los procesos.
+- Proporcionar herramientas de exportación y respaldo de información.
+- Mantener una estructura tecnológica modular y de fácil mantenimiento.
+
+## 3. Características principales
+
+| Módulo | Descripción |
+|---|---|
+| Gestión de vacantes | Administración y seguimiento de oportunidades laborales. |
+| Gestión de usuarios | Control de cuentas y permisos de acceso. |
+| Autenticación | Acceso mediante mecanismos de validación de identidad. |
+| Control por roles | Acceso diferenciado según el perfil del usuario. |
+| Gestión de candidatos | Organización de información relacionada con los aspirantes. |
+| Auditoría | Registro de actividades y operaciones del sistema. |
+| Estadísticas | Consulta de información para el seguimiento de procesos. |
+| Exportación | Generación de archivos CSV para el manejo de información. |
+| Historial | Consulta del seguimiento de los procesos registrados. |
+| Respaldos | Herramientas para respaldar la información almacenada. |
+
+## 4. Arquitectura del sistema
+
+La aplicación utiliza una arquitectura dividida en dos componentes principales: frontend y backend. Ambos se comunican mediante solicitudes HTTP a través de una API.
+
+### Diagrama de arquitectura
 
 ```mermaid
-flowchart LR
-    N[Navegador] -->|puerto 8080| F[Frontend<br/>Nginx + Vue]
-    F -->|/api| B[Backend<br/>FastAPI]
-    B --> D[(SQLite<br/>volumen datos)]
+flowchart TB
+    U["Usuario"]
+    F["Frontend<br/>Vue 3 + Vite"]
+    N["Nginx<br/>Servidor web y proxy"]
+    A["Backend<br/>FastAPI"]
+    D[("SQLite<br/>Base de datos")]
+
+    U --> F
+    F --> N
+    N --> A
+    A --> D
 ```
 
-- El navegador entra por el puerto 8080 al contenedor `frontend` (Nginx).
-- Nginx sirve la interfaz y reenvía `/api` al contenedor `backend` (FastAPI).
-- Ambos comparten la red `red-contrataciones` y se encuentran por nombre.
-- La base SQLite vive en el volumen `datos`, así sobrevive aunque se borren los contenedores.
-- Solo el frontend publica un puerto; el backend no es accesible desde fuera.
-
-## Requisitos
-- Podman instalado
-- Git
-
-## Configuración inicial (archivo .env)
-
-Antes de la primera ejecución crea un archivo `.env` en la raíz. **No se sube a GitHub** (está en `.gitignore`):
-
-    SECRET_KEY=una-frase-larga-y-aleatoria
-    ADMIN_USER=admin
-    ADMIN_PASSWORD=una-clave-segura
-
-- `SECRET_KEY`: firma los tokens de sesión.
-- `ADMIN_USER` y `ADMIN_PASSWORD`: crean el primer administrador, solo si la base no tiene usuarios.
+### Componentes tecnológicos
+
+| Componente | Tecnología | Función |
+|---|---|---|
+| Interfaz de usuario | Vue 3 | Construcción de la interfaz web. |
+| Herramientas frontend | Vite | Desarrollo y compilación del frontend. |
+| Servidor web | Nginx | Publicación de archivos y redirección de solicitudes. |
+| API | FastAPI | Procesamiento de solicitudes y lógica del sistema. |
+| Modelado de datos | SQLModel | Definición y administración de modelos. |
+| Base de datos | SQLite | Almacenamiento de información. |
+| Autenticación | JWT | Gestión de sesiones y autenticación mediante tokens. |
+| Protección de contraseñas | bcrypt | Hash de contraseñas. |
+| Pruebas | pytest | Ejecución de pruebas automatizadas. |
+| Contenedores | Podman / Docker | Ejecución de los servicios de la aplicación. |
+| Automatización | GitHub Actions | Integración y ejecución de flujos de trabajo. |
+
+## 5. Perfiles de usuario
+
+El sistema contempla diferentes perfiles para organizar el acceso a las funcionalidades.
+
+| Perfil | Responsabilidad |
+|---|---|
+| Administrador | Administración general del sistema y gestión de usuarios. |
+| Reclutador | Gestión y seguimiento de los procesos de contratación. |
+| Auditor | Consulta y revisión de registros de actividad. |
+
+Los permisos disponibles dependen de la configuración implementada para cada perfil.
+
+## 6. Seguridad de la información
+
+La seguridad es uno de los componentes considerados durante el desarrollo de la plataforma.
 
-Protege el archivo:
+Entre los mecanismos implementados se encuentran:
+
+- **Autenticación:** validación de usuarios mediante JWT.
+- **Protección de contraseñas:** utilización de bcrypt para almacenar contraseñas mediante hash.
+- **Control de acceso:** separación de permisos mediante roles.
+- **Auditoría:** registro de actividades relevantes.
+- **Protección HTTP:** configuración de encabezados de seguridad en Nginx.
+- **Política de contenido:** configuración de Content Security Policy (CSP).
+- **Persistencia:** almacenamiento de información mediante volúmenes de datos.
 
-    chmod 600 .env
+La configuración de seguridad debe mantenerse actualizada y revisarse antes de utilizar el sistema en un entorno productivo.
 
-## Ejecutar
+## 7. Estructura del proyecto
 
-    git clone https://github.com/KevinAlva23/sistema-contrataciones.git
-    cd sistema-contrataciones
-    chmod +x iniciar.sh
-    ./iniciar.sh
+La organización general del repositorio es la siguiente:
 
-Abrir http://localhost:8080
+```text
+sistema-contrataciones/
+│
+├── backend/
+│   ├── main.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── Dockerfile
+│
+├── sistema-contrataciones/
+│
+├── docker-compose.yml
+│
+├── iniciar.sh
+├── demo.sh
+├── respaldo.sh
+│
+├── .env
+├── .env.demo
+│
+└── README.md
+```
 
-El script construye las imágenes, crea la red y el volumen, levanta el backend, espera a que esté listo y después levanta el frontend.
+> La estructura representa los componentes principales documentados del proyecto. Algunos archivos y directorios pueden variar conforme a la versión del repositorio.
 
-Para apagar (los datos se conservan en el volumen):
+## 8. Requisitos del sistema
 
-    ./iniciar.sh detener
+Para ejecutar el proyecto se requiere un entorno compatible con las herramientas utilizadas.
 
-Alternativa con compose (no usar a la vez que el script):
+| Requisito | Descripción |
+|---|---|
+| Sistema operativo | Linux o Windows. |
+| Git | Para obtener y actualizar el repositorio. |
+| Podman o Docker | Para ejecutar los servicios mediante contenedores. |
+| Compose | Para administrar los servicios definidos en el archivo de composición. |
+| Navegador web | Para acceder a la aplicación. |
+| Conexión de red | Necesaria para descargar dependencias y obtener el repositorio. |
 
-    podman compose up -d --build
+## 9. Instalación y ejecución
 
-## Roles y permisos
+### 9.1. Obtener el repositorio
 
-| Rol | Ver | Agregar y editar | Contratar / rechazar | Eliminar | Usuarios | Bitácora |
-|---|---|---|---|---|---|---|
-| admin | Sí | Sí | Sí | Sí | Sí | Sí |
-| reclutador | Sí | Sí | Sí | No | No | No |
-| auditor | Sí | No | No | No | No | Sí |
+Clonar el proyecto desde GitHub:
 
-- Los permisos se validan en el backend, no solo en la pantalla.
-- Las sesiones caducan a las 8 horas.
-- Tras 5 intentos fallidos de login, la cuenta se bloquea 10 minutos.
+```bash
+git clone https://github.com/KevinAlva23/sistema-contrataciones.git
+```
 
-## Contraseñas
-- Se guardan con bcrypt (hash de una sola vía): nadie puede leerlas, solo restablecerlas.
-- Política: mínimo 10 caracteres, con mayúscula, minúscula y número.
-- Cada usuario puede cambiar la suya en la pestaña **Mi cuenta**.
-- El admin puede restablecer la de otros en la pestaña **Usuarios**.
+Entrar al directorio:
 
-## Accesibilidad
-- Se puede usar solo con teclado (Tab, Enter) y tiene enlace para saltar al contenido.
-- Foco visible, etiquetas para lectores de pantalla y mensajes de error anunciados.
-- Modo oscuro automático según la configuración del sistema.
-- Respeta la preferencia de movimiento reducido.
-- Exportación a CSV (admin y auditor)
-- Estadísticas por estado, puesto y mes
-- Modo oscuro y navegación por teclado
+```bash
+cd sistema-contrataciones
+```
 
-## Funciones
-- Inicio de sesión con roles (admin, reclutador, auditor)
-- Alta y edición de candidatos con validación en pantalla y en el backend
-- Cambio de estado: pendiente, contratado, rechazado
-- Eliminación con confirmación (solo admin)
-- Búsqueda por nombre, email o puesto y filtro por estado
-- Tarjetas de resumen por estado
-- Teléfono de 10 dígitos y email único
-- Administración de usuarios desde la página
-- Bitácora de auditoría (quién hizo qué y cuándo)
-- Cambio de contraseña propia
+### 9.2. Ejecución en Linux
 
-## API
-Documentación interactiva en http://localhost:8080/api/docs
+El proyecto incluye un script de inicio para facilitar la ejecución.
 
-- `POST /login`: inicia sesión y devuelve el token
-- `GET /yo`: datos del usuario actual
-- `POST /cambiar-clave`: cambia la contraseña propia
-- `GET/POST/PATCH/DELETE /usuarios`: gestión de usuarios (admin)
-- `GET /bitacora`: registro de auditoría (admin, auditor)
-- `GET /candidatos`: lista (todos los roles)
-- `POST /candidatos`: crea (admin, reclutador)
-- `PUT /candidatos/{id}`: edita datos (admin, reclutador)
-- `PATCH /candidatos/{id}?estado=...`: cambia el estado (admin, reclutador)
-- `DELETE /candidatos/{id}`: elimina (admin)
+Dar permisos de ejecución:
 
-## Estructura
-- `iniciar.sh`: construye y levanta todo
-- `respaldo.sh`: respaldo y restauración de la base de datos
-- `docker-compose.yml`: alternativa con compose
-- `backend/`: API (`main.py`, `requirements.txt`, `Dockerfile`, `tests/`)
-- `frontend/`: interfaz Vue (`src/`, `nginx.conf`, `Dockerfile`)
-- `.github/workflows/tests.yml`: pruebas automáticas
-- `.env`: secretos locales (no se sube)
+```bash
+chmod +x iniciar.sh
+```
 
-## Publicar el sistema real
+Ejecutar:
 
-Por defecto el sistema solo se usa en el equipo (`http://localhost:8080`). Para acceder desde otro lugar se puede abrir un túnel de Cloudflare (gratis, con HTTPS, sin abrir puertos del router).
+```bash
+./iniciar.sh
+```
 
-Instalar `cloudflared` sin permisos de administrador:
+Si se utiliza Podman Compose o Docker Compose directamente, y el entorno cuenta con el complemento correspondiente, también puede iniciarse mediante:
 
-    mkdir -p ~/.local/bin
-    curl -L -C - --retry 10 -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-    chmod +x ~/.local/bin/cloudflared
+```bash
+podman compose up -d --build
+```
 
-Abrir el túnel:
+O:
 
-    ~/.local/bin/cloudflared tunnel --url http://localhost:8080
+```bash
+docker compose up -d --build
+```
 
-En segundo plano:
+### 9.3. Ejecución en Windows
 
-    nohup ~/.local/bin/cloudflared tunnel --url http://localhost:8080 > ~/tunel.log 2>&1 &
-    grep -o "https://[a-z0-9-]*\.trycloudflare\.com" ~/tunel.log | head -1    # ver la dirección
-    pkill cloudflared                                                         # apagar
+En Windows se puede utilizar Docker Desktop con Docker Compose o una instalación compatible de Podman.
 
-La dirección cambia cada vez y solo funciona mientras el equipo esté encendido y con internet. Es un servicio pensado para pruebas, sin garantía de disponibilidad.
+1. Instalar y configurar el motor de contenedores.
+2. Abrir PowerShell.
+3. Clonar el repositorio.
+4. Acceder a la carpeta del proyecto.
+5. Ejecutar el siguiente comando:
 
-### Antes de publicar
-- Cambia la contraseña del administrador desde **Mi cuenta** (mínimo 10 caracteres, con mayúscula, minúscula y número).
-- Desactiva los usuarios que no uses desde la pestaña **Usuarios**.
-- Usa una `SECRET_KEY` larga y aleatoria en `.env`.
-- Revisa la **Bitácora** con frecuencia (intentos fallidos e inicios de sesión extraños).
-- Haz respaldos con `./respaldo.sh`.
+```powershell
+docker compose up -d --build
+```
 
-## Respaldos
+También puede utilizarse Podman Compose si está instalado y configurado correctamente.
 
-    ./respaldo.sh                      # crea un respaldo con fecha
-    ./respaldo.sh listar               # lista los respaldos
-    ./respaldo.sh restaurar ARCHIVO    # restaura uno
+> El script `iniciar.sh` está diseñado para entornos Bash. Para Windows, se recomienda utilizar Compose directamente desde PowerShell.
 
-Se conservan los últimos 14. La carpeta `respaldos/` no se sube a GitHub porque contiene datos personales.
+### 9.4. Acceso a la aplicación
 
-## Pruebas
+Una vez que los servicios estén iniciados, abrir el navegador y acceder a:
 
-    cd backend
-    pip install -r requirements.txt -r requirements-dev.txt
-    pytest
+**Aplicación web:**
 
-GitHub Actions ejecuta las pruebas y compila el frontend en cada push.
+```text
+http://localhost:8080
+```
 
-## Comandos útiles
+**Documentación de la API:**
 
-    podman ps                  # ver contenedores
-    podman logs -f backend     # logs del backend
-    podman logs -f frontend    # logs del frontend
+```text
+http://localhost:8080/api/docs
+```
 
-## Historial de cambios
+La disponibilidad de estas direcciones depende de que los contenedores hayan iniciado correctamente y de que el puerto esté libre.
 
-### v1.27 - Comodidad y datos
-- Tema claro/oscuro manual y modo compacto (se recuerdan)
-- Aviso 10 minutos antes de que caduque la sesión
-- Importación de candidatos desde CSV (admin), con reporte de errores
+## 10. Configuración del entorno
 
-### v1.26 - Detalle y atajos
-- Panel lateral de detalle al hacer clic en un candidato
-- Atajos de teclado: / buscar, n nuevo, Esc cerrar, ? ayuda
+El proyecto contempla archivos de configuración para establecer los parámetros necesarios de ejecución.
 
-### v1.25 - Tablero
-- Vista de tablero por estado con arrastrar y soltar
-- Selector de "MOver a" accesible por teclado y en celular}
-- Solo admin y reclutador pueden mover candidatos
+| Archivo | Propósito |
+|---|---|
+| `.env` | Variables de entorno de la aplicación. |
+| `.env.demo` | Configuración destinada al entorno de demostración. |
 
-### v1.24 - Pulido visual
-- Avisos flotantes al guardar, cambiar estado o eliminar
-- Avatares con iniciales
-- Vista alternable de tabla o tarjetas
+Las variables de entorno pueden incluir parámetros de ejecución, autenticación y configuración interna.
 
-### v1.23 - PostgreSQL y Alembic
-- Base de datos PostgreSQL en su propio contenedor (tres contenedores)
-- Migraciones con Alembic en lugar de ALTER TABLE manual
-- Respaldos con pg_dump en `respaldo.sh`
-- El frontend escucha solo en 127.0.0.1
+**Recomendaciones:**
 
-### v1.22 - Embudo y seguimiento
-- Embudo de selección por etapas (pendiente, entrevista, oferta, contratado)
-- Aviso de candidatos que llevan más de 7 días sin avanzar
-- Columna de días desde el registro
+- No publicar contraseñas ni claves privadas.
+- No compartir tokens de autenticación.
+- No subir archivos `.env` con información sensible.
+- Mantener una configuración independiente para pruebas y producción.
+- Utilizar valores seguros para las claves de autenticación.
 
-### v1.21 - Estados y notas
-- Nuevos estados: en entrevista y oferta enviada
-- Notas de seguimiento por candidato
-- Filtro y estadísticas con los estados nuevos
+## 11. API y documentación
 
-### v1.20 - Publicación del sistema
-- Instrucciones para exponer el sistema con Cloudflare Tunnel (HTTPS, sin abrir puertos)
-- Túnel en segundo plano con `nohup` y apagado con `pkill`
-- Recomendaciones de seguridad antes de publicar
+El backend utiliza FastAPI para proporcionar los servicios de comunicación entre la interfaz y la lógica de negocio.
 
-### v1.19 - Orden y paginación
-- Ordenar la tabla por nombre, email, puesto, teléfono o estado
-- Paginación de 10, 25 o 50 filas
-- Encabezados accesibles con teclado y lectores de pantalla
+La documentación interactiva permite consultar los endpoints disponibles y revisar los esquemas de las solicitudes y respuestas.
 
-### v1.18 - Accesibilidad y modo oscuro
-- Modo oscuro automático según la configuración del sistema
-- Navegación completa por teclado y enlace "Saltar al contenido"
-- Foco visible y etiquetas ARIA en campos y botones
-- Botones que indican a quién afectan (por ejemplo, "Contratar a Ana")
-- Errores anunciados a lectores de pantalla
-- Respeta la preferencia de reducir movimiento
+**Documentación:**
 
-### v1.17 - Endurecimiento
-- Cabeceras de seguridad en Nginx (CSP, X-Frame-Options, nosniff)
-- Contenedores de solo lectura, sin privilegios extra y con límites de memoria
-- Reinicio automático de los contenedores
+```text
+http://localhost:8080/api/docs
+```
 
-### v1.16 - Estadísticas
-- Pestaña Estadísticas: totales, tasa de contratación, por estado, puesto y mes
-- Fecha de registro de cada candidato (migración automática de la columna)
+Desde esta sección es posible consultar los servicios disponibles según la configuración actual de la API.
 
-### v1.15 - Exportación
-- Exportar candidatos a CSV (admin y auditor)
-- Neutraliza fórmulas peligrosas en Excel
-- Cada exportación queda en la bitácora
+## 12. Almacenamiento y persistencia
 
-### v1.14 - Contraseñas
-- Pestaña Mi cuenta para cambiar la contraseña propia
-- Política de contraseñas: 10+ caracteres con mayúscula, minúscula y número
-- Registro del cambio en la bitácora (sin guardar la clave)
+La aplicación utiliza SQLite como sistema de almacenamiento documentado para la configuración actual del proyecto.
 
-### v1.13 - Pruebas automáticas
-- Pruebas con pytest de login, roles, validaciones, bloqueo y bitácora
-- GitHub Actions ejecuta las pruebas y compila el frontend
-- Ruta de la base configurable con `DATABASE_URL`
-- Corrección de las respuestas de crear candidato y cambiar estado
+La persistencia de la información se gestiona mediante un volumen de datos, lo que permite conservar los registros independientemente del ciclo de vida de los contenedores.
 
-### v1.12 - Respaldos
-- `respaldo.sh` crea copias seguras con fecha y conserva las últimas 14
-- Restauración con `./respaldo.sh restaurar ARCHIVO`
+La estructura de almacenamiento debe mantenerse protegida y respaldarse periódicamente para reducir el riesgo de pérdida de información.
 
-### v1.11 - Bitácora de auditoría
-- Registro de altas, ediciones, cambios de estado y eliminaciones
-- Registro de cambios de usuarios, inicios de sesión y accesos fallidos
-- Pestaña Bitácora para admin y auditor (solo lectura)
+## 13. Respaldos de información
 
-### v1.10 - Administración de usuarios
-- Crear, activar/desactivar, cambiar rol, restablecer clave y eliminar
-- Protección para no quedarse sin administrador
+El proyecto incorpora un script destinado a facilitar la generación de respaldos.
 
-### v1.9 - Seguridad de acceso
-- Bloqueo de 10 minutos tras 5 intentos fallidos
+En Linux, ejecutar:
 
-### v1.8 - Rediseño
-- Barra superior, tarjetas de resumen, paneles y pestañas
-- Diseño adaptable a celular
+```bash
+./respaldo.sh
+```
 
-### v1.7 - Usuarios y roles
-- Login con bcrypt y JWT, roles admin, reclutador y auditor
-- Configuración de secretos con `.env`
+Los respaldos deben almacenarse en una ubicación segura y mantenerse separados de los archivos públicos del repositorio.
 
-### v1.6 - Script de inicio
-- `iniciar.sh` construye y levanta todo con un comando
+Se recomienda:
 
-### v1.5 - Validaciones en el backend
-- Teléfono de 10 dígitos y email único validados en la API
+- Realizar respaldos periódicos.
+- Verificar que los archivos generados sean accesibles.
+- Mantener copias independientes del entorno de ejecución.
+- Probar periódicamente los procedimientos de recuperación.
 
-### v1.4 - Búsqueda y confirmación
-- Buscador y confirmación antes de eliminar
+## 14. Entorno de demostración
 
-### v1.3 - Contenedores por separado
-- Backend y frontend independientes, red `red-contrataciones` y volumen `datos`
+El proyecto contempla un entorno de demostración para facilitar la revisión de sus funcionalidades.
 
-### v1.2 - Edición de candidatos
-- Botón Editar y ruta `PUT /candidatos/{id}`
+Este entorno permite evaluar el comportamiento general de la plataforma sin utilizar información real de procesos de contratación.
 
-### v1.1 - Filtro y diseño
-- Filtro por estado y diseño en verde y dorado
+Se recomienda utilizar exclusivamente datos ficticios durante las pruebas y demostraciones.
 
-### v1.0 - Primera versión
-- Alta, cambio de estado y eliminación de candidatos
+## 15. Publicación y acceso remoto
+
+La aplicación puede utilizarse localmente o configurarse para permitir el acceso remoto mediante servicios de publicación compatibles.
+
+En el entorno documentado se contempla el uso de **Cloudflare Tunnel** para establecer una conexión entre la aplicación local y una dirección pública.
+
+Esta alternativa permite publicar el servicio sin necesidad de configurar directamente una IP pública en el equipo.
+
+La publicación remota requiere una configuración adecuada del dominio, túnel, servicios y políticas de seguridad.
+
+> Antes de habilitar el acceso público, se deben revisar las credenciales, permisos, configuración de autenticación y exposición de los servicios.
+
+## 16. Pruebas y control de calidad
+
+El proyecto contempla el uso de herramientas de pruebas automatizadas para revisar el funcionamiento del backend.
+
+La herramienta utilizada es:
+
+**pytest**
+
+Ejecución de pruebas desde el entorno del backend:
+
+```bash
+pytest
+```
+
+También se contempla el uso de GitHub Actions para automatizar procesos de integración y validación del proyecto.
+
+## 17. Mantenimiento y actualización
+
+Para mantener el sistema en condiciones adecuadas de funcionamiento se recomienda:
+
+1. Revisar periódicamente las dependencias.
+2. Mantener actualizado el repositorio.
+3. Verificar los registros de ejecución.
+4. Comprobar la disponibilidad de los servicios.
+5. Realizar respaldos de la información.
+6. Revisar los permisos de acceso.
+7. Ejecutar las pruebas después de realizar cambios.
+8. Documentar las modificaciones realizadas.
+
+## 18. Historial de versiones
+
+El proyecto ha evolucionado mediante distintas actualizaciones enfocadas en ampliar sus funcionalidades, mejorar su estructura y fortalecer su administración.
+
+| Versión | Descripción |
+|---|---|
+| v1.0 | Implementación inicial del sistema. |
+| v1.1 | Mejoras en la estructura general. |
+| v1.2 | Ajustes en funcionalidades y administración. |
+| v1.3 | Mejoras en la interfaz y experiencia de usuario. |
+| v1.4 | Actualizaciones en los procesos internos. |
+| v1.5 | Mejoras en la gestión de información. |
+| v1.6 | Ajustes de funcionamiento. |
+| v1.7 | Mejoras en la administración de usuarios. |
+| v1.8 | Actualizaciones en la gestión de vacantes. |
+| v1.9 | Mejoras en los procesos de seguimiento. |
+| v1.10 | Ajustes generales de funcionamiento. |
+| v1.11 | Mejoras en la organización de la plataforma. |
+| v1.12 | Actualizaciones en la interfaz. |
+| v1.13 | Mejoras en los procesos administrativos. |
+| v1.14 | Ajustes de seguridad y funcionamiento. |
+| v1.15 | Mejoras en el control de información. |
+| v1.16 | Actualizaciones en funcionalidades internas. |
+| v1.17 | Mejoras en la administración del sistema. |
+| v1.18 | Ajustes de rendimiento y estabilidad. |
+| v1.19 | Mejoras en los procesos de gestión. |
+| v1.20 | Actualizaciones generales. |
+| v1.21 | Mejoras en la organización de los componentes. |
+| v1.22 | Ajustes en los procesos de administración. |
+| v1.23 | Incorporación de trabajos relacionados con PostgreSQL, Alembic y herramientas de respaldo de bases de datos. |
+| v1.24 | Mejoras en la gestión y funcionamiento general. |
+| v1.25 | Ajustes en la organización y administración. |
+| v1.26 | Mejoras en funcionalidades y estabilidad. |
+| v1.27 | Actualización de componentes y mejoras generales del sistema. |
+
+## 19. Consideraciones importantes
+
+- El sistema debe ejecutarse en un entorno compatible con sus dependencias.
+- La información de acceso debe mantenerse protegida.
+- Los archivos de configuración con credenciales no deben publicarse.
+- Los respaldos deben almacenarse de manera independiente.
+- La configuración de publicación remota debe revisarse antes de habilitar el acceso público.
+- Se recomienda realizar pruebas antes de implementar nuevas versiones.
+- La información utilizada durante las demostraciones debe ser ficticia.
+
+## 20. Autor y repositorio
+
+**Proyecto:** Sistema de Contrataciones
+
+**Desarrollador:** Kevin Alvarado Garduño
+
+<p align="center">
+
+**SISTEMA DE CONTRATACIONES**
+
+*Gestión organizada, procesos eficientes y control de información.*
+
+</p>
