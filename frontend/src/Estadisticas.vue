@@ -43,7 +43,7 @@ onMounted(cargar)
       <h2 class="panel-titulo">Por estado</h2>
       <div class="panel-cuerpo">
         <div v-for="b in estados" :key="b.k" class="barra-fila">
-          <span class="barra-et">{{ b.k }}</span>
+          <span class="barra-et">{{ b.k.replace('_', ' ') }}</span>
           <div class="barra-pista"><div class="barra" :class="b.k" :style="{ width: b.w + '%' }"></div></div>
           <span class="barra-num">{{ b.v }}</span>
         </div>

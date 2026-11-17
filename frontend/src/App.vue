@@ -23,6 +23,8 @@ const error = ref('')
 const lista = ref(localStorage.getItem('lista') || 'tabla')
 function setLista(v) { lista.value = v; localStorage.setItem('lista', v) }
 const ESTADOS = ['pendiente', 'en_entrevista', 'oferta_enviada', 'contratado', 'rechazado']
+const ETIQUETAS = { pendiente: 'Pendiente', en_entrevista: 'En entrevista', oferta_enviada: 'Oferta enviada', contratado: 'Contratado', rechazado: 'Rechazado' }
+const etiqueta = (e) => ETIQUETAS[e] || e
 const arrastrando = ref(null)
 const sobre = ref('')
 const porEstado = (e) => filtrados.value.filter(c => c.estado === e)
@@ -56,9 +58,10 @@ function atajos(e) {
 onMounted(() => window.addEventListener('keydown', atajos))
 onUnmounted(() => window.removeEventListener('keydown', atajos))
 
-const tema = ref(localStorage.getItem('tema') || '')
+const sistemaOscuro = () => window.matchMedia('(prefers-color-scheme: dark)').matches
+const tema = ref(localStorage.getItem('tema') || (sistemaOscuro() ? 'oscuro' : 'claro'))
 function aplicarTema() {
-  document.documentElement.classList.toggle('tema-oscuro', tema.value === 'oscuro')
+  document.documentElement.dataset.tema = tema.value
 }
 function alternarTema() {
   tema.value = tema.value === 'oscuro' ? 'claro' : 'oscuro'
@@ -101,7 +104,7 @@ async function importar(ev) {
     notify(`Importados: ${d.creados}. Con error: ${d.errores.length}`)
     if (d.errores.length) error.value = d.errores.join(' · ')
     cargar()
-  } catch (e) {}
+  } catch (e) { falla(e) }
 }
 const ini = (n) => n.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()
 const colores = ['#0b7a3e', '#2563eb', '#7c3aed', '#c2410c', '#0f766e', '#be185d', '#a16207']
@@ -113,6 +116,12 @@ const puedeBitacora = computed(() => ['admin', 'auditor'].includes(rol.value))
 
 const total = computed(() => candidatos.value.length)
 const cuenta = (e) => candidatos.value.filter(c => c.estado === e).length
+
+const cargando = ref(true)
+function falla(e) {
+  if (e && e.message === 'sesion') return
+  notify('No se pudo conectar con el servidor', 'error')
+}
 
 async function api(url, opciones = {}) {
   const r = await fetch(url, {
@@ -151,7 +160,7 @@ function salir() {
   token.value = ''; usuario.value = ''; rol.value = ''
   candidatos.value = []
   vista.value = 'candidatos'
-  localStorage.clear()
+  for (const k of ['token', 'usuario', 'rol']) localStorage.removeItem(k)
 }
 
 const filtrados = computed(() => {
@@ -206,7 +215,7 @@ async function cargar() {
   try {
     const r = await api('/api/candidatos')
     candidatos.value = await r.json()
-  } catch (e) {}
+  } catch (e) { falla(e) } finally { cargando.value = false }
 }
 
 async function guardar() {
@@ -227,7 +236,7 @@ async function guardar() {
     notify(editando ? 'Cambios guardados' : 'Candidato agregado')
     cancelar()
     cargar()
-  } catch (e) {}
+  } catch (e) { falla(e) }
 }
 
 function editar(c) {
@@ -242,12 +251,12 @@ function cancelar() {
 }
 
 async function estado(id, e) {
-  try { await api(`/api/candidatos/${id}?estado=${e}`, { method: 'PATCH' }); notify('Estado actualizado'); cargar() } catch (x) {}
+  try { await api(`/api/candidatos/${id}?estado=${e}`, { method: 'PATCH' }); notify('Estado actualizado'); cargar() } catch (x) { falla(x) }
 }
 
 async function borrar(c) {
   if (!confirm(`¿Eliminar a ${c.nombre}? Esta acción no se puede deshacer.`)) return
-  try { await api(`/api/candidatos/${c.id}`, { method: 'DELETE' }); notify('Candidato eliminado'); cargar() } catch (x) {}
+  try { await api(`/api/candidatos/${c.id}`, { method: 'DELETE' }); notify('Candidato eliminado'); cargar() } catch (x) { falla(x) }
 }
 
 async function exportar() {
@@ -260,7 +269,7 @@ async function exportar() {
     a.download = 'candidatos.csv'
     a.click()
     URL.revokeObjectURL(a.href)
-  } catch (e) {}
+  } catch (e) { falla(e) }
 }
 
 onMounted(cargar)
@@ -271,11 +280,14 @@ onMounted(cargar)
   <header class="topbar">
     <div class="topbar-in">
       <div class="marca">
-        Sistema de Contrataciones
-        <small>Recursos Humanos</small>
+        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <div>
+          Sistema de Contrataciones
+          <small>Recursos Humanos</small>
+        </div>
       </div>
       <div class="sesion">
-        <button class="borde" :aria-pressed="tema === 'oscuro'" @click="alternarTema">Tema</button>
+        <button class="borde" :aria-pressed="tema === 'oscuro'" @click="alternarTema">{{ tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro' }}</button>
         <template v-if="token">
         <span class="usuario">{{ usuario }}</span>
         <span class="rol" :class="rol">{{ rol }}</span>
@@ -289,6 +301,16 @@ onMounted(cargar)
 
     <!-- Login -->
     <div v-if="!token" class="login-wrap">
+      <aside class="login-brand">
+        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <h1>Gestiona tu proceso de contratación en un solo lugar</h1>
+        <p>Seguimiento de candidatos, permisos por rol y bitácora de auditoría.</p>
+        <ul>
+          <li>Tablero visual por etapas</li>
+          <li>Importación y exportación CSV</li>
+          <li>Registro de cada operación</li>
+        </ul>
+      </aside>
       <form class="login" @submit.prevent="entrar">
         <h2>Iniciar sesión</h2>
         <p class="sub">Ingresa con tu cuenta asignada</p>
@@ -375,17 +397,17 @@ onMounted(cargar)
             </label>
           </div>
           <div v-if="lista === 'kanban'" class="kanban">
-            <section v-for="e in ESTADOS" :key="e" class="col" :class="{ sobre: sobre === e }"
-              :aria-label="e.replace('_', ' ')"
+            <section v-for="e in ESTADOS" :key="e" class="col" :data-estado="e" :class="{ sobre: sobre === e }"
+              :aria-label="etiqueta(e)"
               @dragover.prevent="sobre = e" @dragleave="sobre = ''" @drop.prevent="soltar(e)">
-              <h3>{{ e.replace('_', ' ') }} <span class="num">{{ porEstado(e).length }}</span></h3>
+              <h3>{{ etiqueta(e) }} <span class="num">{{ porEstado(e).length }}</span></h3>
               <article v-for="c in porEstado(e)" :key="c.id" class="kcard"
                 :draggable="puedeEditar" @dragstart="arrastrando = c" @dragend="sobre = ''">
                 <b><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></b>
                 <small>{{ c.puesto }}</small>
                 <select v-if="puedeEditar" :aria-label="`Mover a ${c.nombre}`" :value="c.estado"
                   @change="estado(c.id, $event.target.value)">
-                  <option v-for="x in ESTADOS" :key="x" :value="x">{{ x.replace('_', ' ') }}</option>
+                  <option v-for="x in ESTADOS" :key="x" :value="x">{{ etiqueta(x) }}</option>
                 </select>
               </article>
             </section>
@@ -399,11 +421,14 @@ onMounted(cargar)
               </header>
               <span>{{ c.puesto }}</span>
               <small>{{ c.email }} · {{ c.telefono }}</small>
-              <span class="estado" :class="c.estado">{{ c.estado.replace('_', ' ') }}</span>
+              <span class="estado" :class="c.estado">{{ etiqueta(c.estado) }}</span>
               <div v-if="puedeEditar" class="acciones">
                 <button class="verde" :aria-label="`Contratar a ${c.nombre}`" @click="estado(c.id,'contratado')">Contratar</button>
                 <button class="rojo" :aria-label="`Rechazar a ${c.nombre}`" @click="estado(c.id,'rechazado')">Rechazar</button>
                 <button class="gris" :aria-label="`Editar a ${c.nombre}`" @click="editar(c)">Editar</button>
+                <button class="gris" :aria-label="`Pasar a entrevista a ${c.nombre}`" @click="estado(c.id,'en_entrevista')">Entrevista</button>
+                <button class="gris" :aria-label="`Enviar oferta a ${c.nombre}`" @click="estado(c.id,'oferta_enviada')">Oferta</button>
+                <button v-if="puedeBorrar" class="rojo" :aria-label="`Eliminar a ${c.nombre}`" @click="borrar(c)">Eliminar</button>
               </div>
             </article>
           </div>
@@ -417,7 +442,10 @@ onMounted(cargar)
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!filtrados.length">
+                <tr v-if="cargando">
+                  <td colspan="6"><div class="esqueleto"></div><div class="esqueleto"></div><div class="esqueleto"></div></td>
+                </tr>
+                <tr v-else-if="!filtrados.length">
                   <td colspan="6" class="vacio">Sin resultados</td>
                 </tr>
                 <tr v-for="c in visibles" :key="c.id">
@@ -425,7 +453,7 @@ onMounted(cargar)
                   <td>{{ c.email }}</td>
                   <td>{{ c.puesto }}</td>
                   <td>{{ c.telefono }}</td>
-                  <td><span class="estado" :class="c.estado">{{ c.estado.replace('_', ' ') }}</span></td>
+                  <td><span class="estado" :class="c.estado">{{ etiqueta(c.estado) }}</span></td>
                   <td v-if="puedeEditar" class="acciones">
                     <button class="gris" :aria-label="`Pasar a entrevista a ${c.nombre}`" @click="estado(c.id,'en_entrevista')">Entrevista</button>
                     <button class="gris" :aria-label="`Enviar oferta a ${c.nombre}`" @click="estado(c.id,'oferta_enviada')">Oferta</button>
@@ -471,7 +499,7 @@ onMounted(cargar)
         <span class="avatar" :style="{ background: colorDe(detalle.nombre) }" aria-hidden="true">{{ ini(detalle.nombre) }}</span>
         {{ detalle.nombre }}
       </h2>
-      <span class="estado" :class="detalle.estado">{{ detalle.estado.replace('_', ' ') }}</span>
+      <span class="estado" :class="detalle.estado">{{ etiqueta(detalle.estado) }}</span>
       <dl>
         <dt>Puesto</dt><dd>{{ detalle.puesto }}</dd>
         <dt>Email</dt><dd>{{ detalle.email }}</dd>

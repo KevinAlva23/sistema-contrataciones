@@ -48,7 +48,7 @@ async function cambiar() {
         <button>Cambiar contraseña</button>
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p v-if="ok" style="color: var(--verde); font-weight: 600">{{ ok }}</p>
+      <p v-if="ok" class="exito">{{ ok }}</p>
     </form>
   </section>
 </template>
