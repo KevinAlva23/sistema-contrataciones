@@ -3,9 +3,9 @@ dist/
 __pycache__/
 *.pyc
 *.db
+.pytest_cache/
 .env
+.env.demo
 .vscode/
-sistema-contrataciones/
 respaldos/
 *.csv
-env.demo

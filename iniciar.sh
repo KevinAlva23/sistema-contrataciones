@@ -12,6 +12,18 @@ if [ "$1" = "detener" ]; then
   exit 0
 fi
 
+# Si no existe .env, lo crea con una clave secreta aleatoria
+if [ ! -f .env ]; then
+  echo "No existe el archivo .env. Vamos a crearlo."
+  read -r -s -p "Contraseña del administrador (mín. 10, con mayúscula, minúscula y número): " CLAVE; echo
+  if [ ${#CLAVE} -lt 10 ] || ! [[ "$CLAVE" =~ [A-Z] ]] || ! [[ "$CLAVE" =~ [a-z] ]] || ! [[ "$CLAVE" =~ [0-9] ]]; then
+    echo "La contraseña no cumple los requisitos."; exit 1
+  fi
+  printf 'SECRET_KEY=%s\nADMIN_USER=admin\nADMIN_PASSWORD=%s\n' "$(openssl rand -hex 32)" "$CLAVE" > .env
+  chmod 600 .env
+  echo ".env creado."
+fi
+
 # Si algo falla, el script se detiene
 set -e
 

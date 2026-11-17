@@ -664,7 +664,7 @@ sistema-contrataciones/
 │   └── workflows/
 │       └── tests.yml
 │
-├── .env.demo
+├── .env.example
 ├── .gitignore
 ├── docker-compose.yml
 ├── iniciar.sh
@@ -684,7 +684,7 @@ sistema-contrataciones/
 | `iniciar.sh` | Construcción, inicio y detención del sistema. |
 | `demo.sh` | Script de entorno de demostración. |
 | `respaldo.sh` | Creación, consulta y restauración de respaldos. |
-| `.env.demo` | Configuración de demostración. |
+| `.env.example` | Plantilla de configuración (copiar a `.env`). |
 | `.gitignore` | Exclusión de archivos locales y sensibles. |
 
 ## 18. Historial de versiones

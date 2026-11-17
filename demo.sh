@@ -4,6 +4,12 @@
 #      ./demo.sh sembrar    carga candidatos ficticios y la cuenta pública
 #      ./demo.sh detener
 RED=red-demo
+
+# La configuración de la demo se genera sola y no se sube a GitHub
+if [ ! -f .env.demo ]; then
+  printf 'SECRET_KEY=%s\nADMIN_USER=admin\nADMIN_PASSWORD=%s\n' "$(openssl rand -hex 32)" "Demo$(openssl rand -hex 8)Aa1" > .env.demo
+  chmod 600 .env.demo
+fi
 if [ "$1" = "detener" ]; then
   podman rm -f frontend-demo backend-demo; exit 0
 fi
