@@ -7,7 +7,7 @@
 **Administración · Seguridad · Seguimiento · Control de información**
 
 ![Estado](https://img.shields.io/badge/Estado-En%20desarrollo-315B7D?style=for-the-badge)
-![Versión](https://img.shields.io/badge/Versión-1.27-183B5B?style=for-the-badge)
+![Versión](https://img.shields.io/badge/Versión-1.28-183B5B?style=for-the-badge)
 ![Frontend](https://img.shields.io/badge/Vue.js-3-42B883?style=for-the-badge)
 ![Backend](https://img.shields.io/badge/FastAPI-Python-009688?style=for-the-badge)
 ![Base de datos](https://img.shields.io/badge/Base%20de%20datos-SQLite-315B7D?style=for-the-badge)
@@ -60,6 +60,7 @@ Desarrollar una herramienta digital que facilite la administración y el seguimi
 | Importación CSV | Incorporación de candidatos mediante archivos CSV. |
 | Respaldos | Generación, consulta y restauración de copias de seguridad. |
 | Accesibilidad | Navegación por teclado, etiquetas accesibles y preferencias visuales. |
+| Interfaz | Diseño adaptable a celular, tema claro/oscuro (sigue al sistema o se cambia a mano), estados con color y tablero por columnas. |
 
 ### Estados de seguimiento
 
@@ -155,7 +156,9 @@ El sistema incorpora mecanismos para proteger las cuentas, controlar el acceso y
 ### Protección de acceso
 
 - Las sesiones caducan después de 8 horas.
-- Después de 5 intentos fallidos de inicio de sesión, la cuenta se bloquea durante 10 minutos.
+- Después de 5 intentos fallidos de inicio de sesión, el acceso con ese usuario desde esa dirección IP se bloquea durante 10 minutos. Así, una persona externa no puede dejar fuera a otros usuarios.
+- La clave `SECRET_KEY` es obligatoria (mínimo 16 caracteres): si falta, el backend no arranca, para evitar que las sesiones se invaliden en cada reinicio.
+- El cliente solo puede enviar los datos propios del candidato; el estado, el identificador y la fecha de registro los asigna el servidor.
 - Los permisos se comprueban en el backend.
 - Se registra la actividad relacionada con los accesos y las operaciones del sistema.
 
@@ -212,13 +215,18 @@ cd sistema-contrataciones
 
 ### 8.3. Configurar las variables de entorno
 
-Crear el archivo `.env` en la raíz del proyecto:
+Hay dos formas de crear el archivo `.env` en la raíz del proyecto.
+
+**Opción A (recomendada):** ejecutar `./iniciar.sh`. Si el archivo no existe, el script lo crea, genera una `SECRET_KEY` aleatoria y solicita la contraseña del administrador.
+
+**Opción B (manual):** copiar la plantilla y editarla:
 
 ```bash
+cp .env.example .env
 nano .env
 ```
 
-Agregar la configuración inicial:
+Contenido esperado:
 
 ```env
 SECRET_KEY=una-frase-larga-y-aleatoria
@@ -230,7 +238,7 @@ Descripción:
 
 | Variable | Función |
 |---|---|
-| `SECRET_KEY` | Clave utilizada para firmar los tokens de sesión. |
+| `SECRET_KEY` | Clave utilizada para firmar los tokens de sesión. Obligatoria, mínimo 16 caracteres. |
 | `ADMIN_USER` | Nombre del primer administrador. |
 | `ADMIN_PASSWORD` | Contraseña inicial del administrador. |
 
@@ -258,7 +266,7 @@ Iniciar la aplicación:
 ./iniciar.sh
 ```
 
-El script construye las imágenes, crea la red y el volumen, inicia el backend, espera a que esté disponible y posteriormente inicia el frontend.
+Si no existe el archivo `.env`, el script lo crea y solicita la contraseña del administrador. Después construye las imágenes, crea la red y el volumen, inicia el backend, espera a que esté disponible y posteriormente inicia el frontend.
 
 ### 8.5. Iniciar mediante Compose
 
@@ -275,6 +283,8 @@ docker compose up -d --build
 ```
 
 **Nota:** utilizar el script de inicio o Compose como método de administración, sin ejecutar ambos simultáneamente.
+
+Compose lee la configuración del archivo `.env` (que debe existir antes de ejecutarlo) y aplica las mismas restricciones de seguridad que el script de inicio: sistema de archivos de solo lectura, sin privilegios adicionales, límites de memoria y reinicio automático.
 
 ### 8.6. Iniciar en Windows
 
@@ -307,6 +317,25 @@ En Linux, utilizar:
 
 Los datos almacenados en el volumen persistente se conservan al detener los contenedores.
 
+### 8.9. Solución de problemas
+
+| Síntoma | Causa y solución |
+|---|---|
+| `parsing file ".env": no such file or directory` | Falta el archivo `.env`. Ejecutar `./iniciar.sh` (lo crea) o copiar `.env.example` a `.env`. |
+| El backend se cae al iniciar con "Falta SECRET_KEY" | `.env` no tiene `SECRET_KEY` o tiene menos de 16 caracteres. Generar una con `openssl rand -hex 32`. |
+| Error de compilación `Element is missing end tag` | Hay una etiqueta sin cerrar en un archivo `.vue`. El mensaje indica archivo, línea y columna. |
+| La interfaz se ve sin estilos o desactualizada | Recargar sin caché con `Ctrl + F5`. |
+| "Demasiados intentos" al iniciar sesión | Esperar 10 minutos o pedir a un administrador que restablezca la contraseña. |
+| El puerto 8080 está ocupado | Detener el otro servicio o cambiar el puerto en `iniciar.sh` y `docker-compose.yml`. |
+
+Para volver a crear el administrador inicial hay que partir de una base de datos vacía. **Esto borra todos los datos**, por lo que primero conviene crear un respaldo con `./respaldo.sh`:
+
+```bash
+./iniciar.sh detener
+podman volume rm datos
+./iniciar.sh
+```
+
 ## 9. Administración de candidatos
 
 La plataforma permite administrar los registros de candidatos mediante las siguientes operaciones:
@@ -326,9 +355,11 @@ La plataforma permite administrar los registros de candidatos mediante las sigui
 
 La API realiza validaciones para mantener la consistencia de los datos:
 
+- Nombre, correo electrónico y puesto son obligatorios; los espacios sobrantes se eliminan.
 - El teléfono debe contener 10 dígitos.
-- El correo electrónico debe ser único.
-- Los campos se validan tanto en la interfaz como en el backend.
+- El correo electrónico debe tener un formato válido y ser único (sin distinguir mayúsculas).
+- Se limita la longitud de los campos (120 caracteres en nombre y puesto, 2000 en notas).
+- Los campos se validan tanto en la interfaz como en el backend, incluida la importación CSV.
 
 ## 10. Administración de usuarios y auditoría
 
@@ -411,19 +442,23 @@ http://localhost:8080/api/docs
 
 | Método | Endpoint | Descripción |
 |---|---|---|
+| GET | `/salud` | Comprobación de que el servicio responde (sin autenticación). |
 | POST | `/login` | Inicio de sesión y generación de token. |
 | GET | `/yo` | Consulta del usuario autenticado. |
 | POST | `/cambiar-clave` | Cambio de contraseña propia. |
 | GET | `/usuarios` | Consulta de usuarios. |
 | POST | `/usuarios` | Creación de usuarios. |
-| PATCH | `/usuarios` | Modificación de usuarios. |
-| DELETE | `/usuarios` | Eliminación de usuarios. |
+| PATCH | `/usuarios/{id}` | Modificación de usuarios. |
+| DELETE | `/usuarios/{id}` | Eliminación de usuarios. |
 | GET | `/bitacora` | Consulta de registros de auditoría. |
 | GET | `/candidatos` | Consulta de candidatos. |
 | POST | `/candidatos` | Registro de candidatos. |
 | PUT | `/candidatos/{id}` | Edición de candidatos. |
 | PATCH | `/candidatos/{id}?estado=...` | Actualización del estado. |
 | DELETE | `/candidatos/{id}` | Eliminación de candidatos. |
+| GET | `/candidatos/exportar` | Exportación CSV (administrador y auditor). |
+| POST | `/candidatos/importar` | Importación CSV (solo administrador). |
+| GET | `/estadisticas` | Indicadores por estado, puesto y mes (administrador y auditor). |
 
 Los permisos de cada endpoint se aplican de acuerdo con el rol del usuario autenticado.
 
@@ -448,6 +483,8 @@ Ejecutar las pruebas:
 ```bash
 pytest
 ```
+
+Las pruebas cubren autenticación y bloqueo de acceso, roles y permisos, validaciones de candidatos (teléfono, correo, duplicados, campos vacíos), protección contra asignación de campos de control, bitácora, exportación e importación CSV, estadísticas y el endpoint `/salud`.
 
 ### Integración continua
 
@@ -684,13 +721,14 @@ sistema-contrataciones/
 | `iniciar.sh` | Construcción, inicio y detención del sistema. |
 | `demo.sh` | Script de entorno de demostración. |
 | `respaldo.sh` | Creación, consulta y restauración de respaldos. |
-| `.env.example` | Plantilla de configuración (copiar a `.env`). |
+| `.env.example` | Plantilla de configuración (copiar a `.env`). `.env` y `.env.demo` no se suben a GitHub. |
 | `.gitignore` | Exclusión de archivos locales y sensibles. |
 
 ## 18. Historial de versiones
 
 | Versión | Actualizaciones |
 |---|---|
+| **v1.28 – Endurecimiento y rediseño** | `SECRET_KEY` obligatoria, validación de correo y campos, bloqueo por IP, endpoint `/salud`, `.env.demo` fuera del repositorio con `.env.example` y creación automática de `.env`, Compose con restricciones, nuevo diseño visual (tema claro/oscuro, estados con color, login en dos paneles, tablero por columnas), avisos de error de conexión y guía de solución de problemas. |
 | **v1.27 – Comodidad y datos** | Tema claro/oscuro manual, modo compacto, aviso de caducidad de sesión e importación CSV con reporte de errores. |
 | **v1.26 – Detalle y atajos** | Panel lateral de detalle y atajos de teclado. |
 | **v1.25 – Tablero** | Vista de tablero por estado con arrastrar y soltar; selector accesible para cambiar candidatos de estado. |
@@ -726,7 +764,7 @@ sistema-contrataciones/
 
 Para mantener el funcionamiento adecuado de la plataforma se recomienda:
 
-1. Mantener protegidas las credenciales y variables de entorno.
+1. Mantener protegidas las credenciales y variables de entorno (`.env` y `.env.demo` no deben subirse a GitHub).
 2. Utilizar contraseñas seguras.
 3. Revisar periódicamente los usuarios y sus permisos.
 4. Consultar la bitácora de auditoría.
@@ -745,7 +783,7 @@ Para mantener el funcionamiento adecuado de la plataforma se recomienda:
 |---|---|
 | **Nombre** | Sistema de Contrataciones |
 | **Desarrollador** | Kevin Alvarado Garduño |
-| **Versión documentada** | 1.27 |
+| **Versión documentada** | 1.28 |
 | **Repositorio** | GitHub |
 | **Tecnologías principales** | Vue 3, FastAPI, Nginx, SQLite y Podman |
 | **Tipo de aplicación** | Aplicación web de gestión |
