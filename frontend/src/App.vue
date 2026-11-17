@@ -280,7 +280,8 @@ onMounted(cargar)
         <span class="usuario">{{ usuario }}</span>
         <span class="rol" :class="rol">{{ rol }}</span>
         <button class="borde" @click="salir">Cerrar sesión</button>
-      </div>
+        </template>
+       </div>
     </div>
   </header>
 
