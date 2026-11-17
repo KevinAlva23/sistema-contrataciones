@@ -169,3 +169,40 @@ def test_importar_csv(client, admin, reclutador):
     assert r.status_code == 200
     assert r.json()["creados"] == 1 and len(r.json()["errores"]) == 1
     assert client.post("/candidatos/importar", headers=reclutador, json={"contenido": csv_ok}).status_code == 403
+
+
+# ---------- Endurecimiento ----------
+def test_email_con_formato_invalido(client, admin):
+    r = client.post("/candidatos", headers=admin, json=candidato(email="no-es-un-correo"))
+    assert r.status_code == 422
+
+
+def test_campos_vacios_son_rechazados(client, admin):
+    r = client.post("/candidatos", headers=admin, json=candidato(nombre="   "))
+    assert r.status_code == 422
+
+
+def test_email_duplicado_ignora_mayusculas(client, admin):
+    c = candidato()
+    assert client.post("/candidatos", headers=admin, json=c).status_code == 200
+    r = client.post("/candidatos", headers=admin, json=candidato(email=c["email"].upper()))
+    assert r.status_code == 409
+
+
+def test_cliente_no_puede_fijar_estado_ni_id(client, admin):
+    r = client.post("/candidatos", headers=admin,
+                    json=candidato(estado="contratado", id=9999, creado="2000-01-01"))
+    assert r.status_code == 200
+    d = r.json()
+    assert d["estado"] == "pendiente" and d["id"] != 9999
+    assert not d["creado"].startswith("2000")
+
+
+def test_editar_valida_telefono(client, admin):
+    nuevo = client.post("/candidatos", headers=admin, json=candidato()).json()
+    malo = {**candidato(), "email": nuevo["email"], "telefono": "abc"}
+    assert client.put(f"/candidatos/{nuevo['id']}", headers=admin, json=malo).status_code == 422
+
+
+def test_endpoint_de_salud(client):
+    assert client.get("/salud").json() == {"ok": True}

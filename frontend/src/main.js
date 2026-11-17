@@ -1,10 +1,13 @@
-// Importa la función createApp desde la librería Vue
 import { createApp } from 'vue'
-// Importa tu pantalla principal (el archivo App.vue)
 import App from './App.vue'
-// Importa los estilos; Vite los incluye en la compilación final
 import './style.css'
 
-// Crea la aplicación con App y la "monta" dentro del <div id="app">
-// que está en index.html. Desde aquí Vue controla esa parte de la página
+// Aplica el tema guardado antes de montar la app (evita parpadeos).
+// Va aquí y no en index.html porque la CSP de Nginx bloquea scripts en línea.
+try {
+  const t = localStorage.getItem('tema')
+  if (t) document.documentElement.dataset.tema = t
+  if (localStorage.getItem('compacto') === '1') document.documentElement.classList.add('compacto')
+} catch (e) {}
+
 createApp(App).mount('#app')

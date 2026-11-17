@@ -1,22 +1,28 @@
 import csv
 import io
 import os
-import secrets
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 
-SECRET = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+SECRET = os.environ.get("SECRET_KEY", "")
+if len(SECRET) < 16:
+    # Sin una clave fija, cada reinicio invalidaría todas las sesiones.
+    raise RuntimeError(
+        "Falta SECRET_KEY (mínimo 16 caracteres). Crea el archivo .env; ver README."
+    )
 ROLES = ("admin", "reclutador", "auditor")
 ESTADOS = ("pendiente", "en_entrevista", "oferta_enviada", "contratado", "rechazado")
 
-# Bloqueo tras intentos fallidos: usuario -> (fallos, bloqueado_hasta)
+# Bloqueo tras intentos fallidos: "ip|usuario" -> (fallos, bloqueado_hasta)
 INTENTOS = {}
 MAX_FALLOS = 5
 BLOQUEO_MIN = 10
@@ -47,6 +53,18 @@ class Bitacora(SQLModel, table=True):
     usuario: str
     accion: str
     detalle: str = ""
+
+
+class CandidatoIn(SQLModel):
+    """Datos que el cliente puede enviar (sin id, estado ni fecha)."""
+    nombre: str
+    email: str
+    puesto: str
+    telefono: str
+    notas: str = ""
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class Login(SQLModel):
@@ -154,19 +172,53 @@ def requiere(*roles):
     return comprobar
 
 
+def normalizar(c):
+    """Limpia espacios y valida los campos de un candidato (modifica c)."""
+    c.nombre = (c.nombre or "").strip()
+    c.email = (c.email or "").strip().lower()
+    c.puesto = (c.puesto or "").strip()
+    c.telefono = (c.telefono or "").strip()
+    c.notas = (c.notas or "").strip()
+    if not (c.nombre and c.email and c.puesto):
+        raise HTTPException(422, "Nombre, email y puesto son obligatorios")
+    if len(c.nombre) > 120 or len(c.puesto) > 120 or len(c.email) > 200:
+        raise HTTPException(422, "Alguno de los campos es demasiado largo")
+    if len(c.notas) > 2000:
+        raise HTTPException(422, "Las notas no pueden pasar de 2000 caracteres")
+    if not EMAIL_RE.match(c.email):
+        raise HTTPException(422, "El email no tiene un formato válido")
+    return c
+
+
 def validar(c, s, id_actual=None):
+    normalizar(c)
     if not (c.telefono.isdigit() and len(c.telefono) == 10):
         raise HTTPException(422, "El teléfono debe tener 10 dígitos")
-    existente = s.exec(select(Candidato).where(Candidato.email == c.email)).first()
+    existente = s.exec(
+        select(Candidato).where(func.lower(Candidato.email) == c.email)
+    ).first()
     if existente and existente.id != id_actual:
         raise HTTPException(409, "Ese email ya está registrado")
 
 
 # ---------- Sesión ----------
+def _ip(request: Request) -> str:
+    return request.headers.get("x-real-ip") or (request.client.host if request.client else "?")
+
+
+@app.get("/salud")
+def salud():
+    return {"ok": True}
+
+
 @app.post("/login")
-def login(datos: Login):
+def login(datos: Login, request: Request):
     ahora = datetime.now(timezone.utc)
-    fallos, hasta = INTENTOS.get(datos.username, (0, None))
+    clave = f"{_ip(request)}|{datos.username[:50]}"
+    if len(INTENTOS) > 5000:  # evita que el diccionario crezca sin límite
+        for k in [k for k, (_, h) in INTENTOS.items() if not h or h < ahora]:
+            INTENTOS.pop(k, None)
+    fallos, hasta = INTENTOS.get(clave, (0, None))
     if hasta and ahora < hasta:
         raise HTTPException(429, "Demasiados intentos. Espera unos minutos.")
     with Session(engine) as s:
@@ -174,12 +226,12 @@ def login(datos: Login):
         if not u or not u.activo or not verificar(datos.password, u.password_hash):
             fallos += 1
             hasta = ahora + timedelta(minutes=BLOQUEO_MIN) if fallos >= MAX_FALLOS else None
-            INTENTOS[datos.username] = (0 if hasta else fallos, hasta)
+            INTENTOS[clave] = (0 if hasta else fallos, hasta)
             detalle = "Cuenta bloqueada 10 min" if hasta else f"Intento fallido {fallos}"
             registrar(s, datos.username[:50], "login_fallido", detalle)
             s.commit()
             raise HTTPException(401, "Usuario o contraseña incorrectos")
-        INTENTOS.pop(datos.username, None)
+        INTENTOS.pop(clave, None)
         registrar(s, u.username, "login", "Inicio de sesión")
         s.commit()
         token = jwt.encode(
@@ -290,7 +342,8 @@ def actualizar_usuario(
         if datos.password is not None:
             cambios.append("contraseña restablecida")
             u.password_hash = hashear(datos.password)
-            INTENTOS.pop(u.username, None)
+            for k in [k for k in INTENTOS if k.endswith("|" + u.username)]:
+                INTENTOS.pop(k, None)
         s.add(u)
         if cambios:
             registrar(s, yo.username, "usuario_modificado", f"{u.username}: " + ", ".join(cambios))
@@ -377,13 +430,11 @@ def importar_csv(datos: ImportarCSV, yo: Usuario = Depends(requiere("admin"))):
                 break
             try:
                 c = Candidato(
-                    nombre=(fila.get("nombre") or "").strip(),
-                    email=(fila.get("email") or "").strip(),
-                    puesto=(fila.get("puesto") or "").strip(),
-                    telefono=(fila.get("telefono") or "").strip(),
+                    nombre=fila.get("nombre") or "",
+                    email=fila.get("email") or "",
+                    puesto=fila.get("puesto") or "",
+                    telefono=fila.get("telefono") or "",
                 )
-                if not (c.nombre and c.email and c.puesto):
-                    raise HTTPException(422, "Faltan campos")
                 validar(c, s)
                 c.creado = datetime.now(timezone.utc).isoformat()
                 s.add(c)
@@ -404,7 +455,8 @@ def listar(_: Usuario = Depends(requiere("admin", "reclutador", "auditor"))):
 
 
 @app.post("/candidatos")
-def crear(c: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))):
+def crear(datos: CandidatoIn, yo: Usuario = Depends(requiere("admin", "reclutador"))):
+    c = Candidato(**datos.model_dump())
     with Session(engine) as s:
         validar(c, s)
         c.creado = datetime.now(timezone.utc).isoformat()
@@ -438,7 +490,7 @@ def cambiar_estado(
 
 @app.put("/candidatos/{id}")
 def editar(
-    id: int, datos: Candidato, yo: Usuario = Depends(requiere("admin", "reclutador"))
+    id: int, datos: CandidatoIn, yo: Usuario = Depends(requiere("admin", "reclutador"))
 ):
     with Session(engine) as s:
         c = s.get(Candidato, id)
