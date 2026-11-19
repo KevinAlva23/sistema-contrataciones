@@ -19,7 +19,7 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt ruff bandit pip-audit
       - name: Estilo y errores (ruff)
-        run: ruff check backend
+        run: ruff check --isolated --select E,F --line-length 120 backend
       - name: Seguridad del código (bandit)
         run: bandit -r backend/main.py -ll
       - name: Dependencias vulnerables (pip-audit)
