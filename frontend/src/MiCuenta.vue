@@ -52,3 +52,19 @@ async function cambiar() {
     </form>
   </section>
 </template>
+
+<script>
+export default {
+  data() { return { prep: null, cod: '', msg: '', err: '' } },
+  methods: {
+    async llamar(ruta, cuerpo) {
+      const r = await fetch('/api/2fa/' + ruta, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.$attrs.token || ''}` },
+        body: JSON.stringify(cuerpo || {})
+      })
+      return [r.ok, await r.json()]
+    }
+  }
+}
+</script>

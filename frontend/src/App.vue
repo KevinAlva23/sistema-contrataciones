@@ -10,7 +10,8 @@ import MiCuenta from './MiCuenta.vue'
 const token = ref(localStorage.getItem('token') || '')
 const usuario = ref(localStorage.getItem('usuario') || '')
 const rol = ref(localStorage.getItem('rol') || '')
-const loginForm = ref({ username: '', password: '' })
+const loginForm = ref({ username: '', password: '', codigo: '' })
+const pideCodigo = ref(false)
 const errorLogin = ref('')
 const vista = ref('candidatos')
 
@@ -35,7 +36,16 @@ function soltar(e) {
 }
 const detalle = ref(null)
 const ayuda = ref(false)
-const abrir = (c) => { detalle.value = c }
+const historialDe = ref([])
+const abrir = async (c) => {
+  detalle.value = c
+  historialDe.value = []
+  if (!puedeBitacora.value) return
+  try {
+    const r = await api(`/api/candidatos/${c.id}/historial`)
+    if (r.ok) historialDe.value = await r.json()
+  } catch (e) {}
+}
 const cerrar = () => { detalle.value = null }
 const diasDe = (c) => c.creado ? Math.floor((Date.now() - new Date(c.creado).getTime()) / 86400000) : null
 
@@ -141,6 +151,7 @@ async function entrar() {
   })
   if (!r.ok) {
     const d = await r.json()
+    if (d.detail === 'Se requiere el código de verificación') pideCodigo.value = true
     errorLogin.value = d.detail || 'No se pudo iniciar sesión'
     return
   }
@@ -151,7 +162,8 @@ async function entrar() {
   localStorage.setItem('token', d.token)
   localStorage.setItem('usuario', d.username)
   localStorage.setItem('rol', d.rol)
-  loginForm.value = { username: '', password: '' }
+  loginForm.value = { username: '', password: '', codigo: '' }
+  pideCodigo.value = false
   vista.value = 'candidatos'
   cargar()
 }
@@ -508,6 +520,15 @@ onMounted(cargar)
       </dl>
       <h3>Notas</h3>
       <div class="notas-caja">{{ detalle.notas || 'Sin notas.' }}</div>
+      <template v-if="puedeBitacora">
+        <h3>Historial</h3>
+        <ul class="linea-tiempo">
+          <li v-if="!historialDe.length">Sin eventos registrados.</li>
+          <li v-for="(h, i) in historialDe" :key="i">
+            <b>{{ new Date(h.fecha).toLocaleString('es-MX') }}</b> · {{ h.usuario }}<br>{{ h.detalle }}
+          </li>
+        </ul>
+      </template>
       <div v-if="puedeEditar" class="acciones">
         <button class="gris" @click="estado(detalle.id,'en_entrevista'); cerrar()">Entrevista</button>
         <button class="gris" @click="estado(detalle.id,'oferta_enviada'); cerrar()">Oferta</button>

@@ -7,6 +7,7 @@ from typing import Optional
 
 import bcrypt
 import jwt
+import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -45,6 +46,8 @@ class Usuario(SQLModel, table=True):
     password_hash: str
     rol: str = "auditor"
     activo: bool = True
+    totp_secreto: Optional[str] = None
+    totp_activo: bool = False
 
 
 class Bitacora(SQLModel, table=True):
@@ -70,6 +73,7 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 class Login(SQLModel):
     username: str
     password: str
+    codigo: Optional[str] = None
 
 
 class NuevoUsuario(SQLModel):
@@ -231,6 +235,13 @@ def login(datos: Login, request: Request):
             registrar(s, datos.username[:50], "login_fallido", detalle)
             s.commit()
             raise HTTPException(401, "Usuario o contraseña incorrectos")
+        if u.totp_activo:
+            if not datos.codigo:
+                raise HTTPException(401, "Se requiere el código de verificación")
+            if not pyotp.TOTP(u.totp_secreto).verify(datos.codigo.strip(), valid_window=1):
+                registrar(s, u.username, "login_fallido", "Código de verificación incorrecto")
+                s.commit()
+                raise HTTPException(401, "Código de verificación incorrecto")
         INTENTOS.pop(clave, None)
         registrar(s, u.username, "login", "Inicio de sesión")
         s.commit()
@@ -240,6 +251,50 @@ def login(datos: Login, request: Request):
             algorithm="HS256",
         )
         return {"token": token, "username": u.username, "rol": u.rol}
+
+
+class CodigoTOTP(SQLModel):
+    codigo: str
+
+
+@app.post("/2fa/preparar")
+def preparar_2fa(yo: Usuario = Depends(usuario_actual)):
+    with Session(engine) as s:
+        u = s.get(Usuario, yo.id)
+        if u.totp_activo:
+            raise HTTPException(400, "Ya está activado")
+        u.totp_secreto = pyotp.random_base32()
+        s.add(u)
+        s.commit()
+        uri = pyotp.TOTP(u.totp_secreto).provisioning_uri(name=u.username, issuer_name="Contrataciones")
+        return {"secreto": u.totp_secreto, "uri": uri}
+
+
+@app.post("/2fa/activar")
+def activar_2fa(datos: CodigoTOTP, yo: Usuario = Depends(usuario_actual)):
+    with Session(engine) as s:
+        u = s.get(Usuario, yo.id)
+        if not u.totp_secreto or not pyotp.TOTP(u.totp_secreto).verify(datos.codigo.strip(), valid_window=1):
+            raise HTTPException(400, "Código incorrecto")
+        u.totp_activo = True
+        s.add(u)
+        registrar(s, u.username, "2fa_activado", "Activó la verificación en dos pasos")
+        s.commit()
+        return {"ok": True}
+
+
+@app.post("/2fa/desactivar")
+def desactivar_2fa(datos: CodigoTOTP, yo: Usuario = Depends(usuario_actual)):
+    with Session(engine) as s:
+        u = s.get(Usuario, yo.id)
+        if not u.totp_activo or not pyotp.TOTP(u.totp_secreto).verify(datos.codigo.strip(), valid_window=1):
+            raise HTTPException(400, "Código incorrecto")
+        u.totp_activo = False
+        u.totp_secreto = None
+        s.add(u)
+        registrar(s, u.username, "2fa_desactivado", "Desactivó la verificación en dos pasos")
+        s.commit()
+        return {"ok": True}
 
 
 @app.get("/yo")
@@ -446,6 +501,22 @@ def importar_csv(datos: ImportarCSV, yo: Usuario = Depends(requiere("admin"))):
         registrar(s, yo.username, "importacion", f"Importó {creados} candidatos desde CSV")
         s.commit()
     return {"creados": creados, "errores": errores[:20]}
+
+
+@app.get("/candidatos/{id}/historial")
+def historial(id: int, _: Usuario = Depends(requiere("admin", "auditor"))):
+    with Session(engine) as s:
+        c = s.get(Candidato, id)
+        if not c:
+            raise HTTPException(404, "No encontrado")
+        filas = s.exec(
+            select(Bitacora)
+            .where(Bitacora.detalle.contains(c.nombre))
+            .order_by(Bitacora.id.desc())
+            .limit(50)
+        ).all()
+        return [{"fecha": b.fecha, "usuario": b.usuario,
+                 "accion": b.accion, "detalle": b.detalle} for b in filas]
 
 
 @app.get("/candidatos")

@@ -328,3 +328,6 @@ html.compacto button { min-height: 30px; padding: 5px 10px; }
   .contenedor { padding: 0 .75rem; }
 }
 .barra-et { text-transform: capitalize; }
+
+.linea-tiempo { list-style: none; margin: 0; padding: 0 0 0 12px;
+  border-left: 3px solid var(--verde); display: flex; flex-direction: column; gap: 10px; font-size: .88rem; }
