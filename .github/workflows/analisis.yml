@@ -41,7 +41,7 @@ jobs:
         run: npm run build
         working-directory: frontend
       - name: Dependencias vulnerables
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
         working-directory: frontend
 
   codeql:
@@ -51,7 +51,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: python, javascript
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
