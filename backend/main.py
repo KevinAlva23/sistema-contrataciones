@@ -382,7 +382,7 @@ def actualizar_usuario(
             if id == yo.id:
                 raise HTTPException(400, "No puedes quitarte tus propios permisos")
             admins = s.exec(
-                select(Usuario).where(Usuario.rol == "admin", Usuario.activo == True)
+                select(Usuario).where(Usuario.rol == "admin", Usuario.activo == True)  # noqa: E712
             ).all()
             if len(admins) <= 1:
                 raise HTTPException(400, "Debe quedar al menos un administrador activo")
