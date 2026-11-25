@@ -63,9 +63,11 @@ def test_flujo_completo_con_aprobacion(c):
     adm = entrar(c)
     rec = con_rol(c, "reclutador")
     cid = candidato(c, rec)["id"]
-    ir = lambda est, **k: c.post(
-        f"/api/candidatos/{cid}/avanzar", headers=rec, json={"estado": est, **k}
-    )  # noqa: E731
+    def ir(est, **k):
+        return c.post(
+            f"/api/candidatos/{cid}/avanzar", headers=rec, json={"estado": est, **k}
+        )
+
     assert ir("oferta").status_code == 409
     for est in ("revision", "entrevista", "tecnica", "oferta"):
         assert ir(est).status_code == 200
