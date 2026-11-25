@@ -1,50 +1,30 @@
-#!/bin/bash
-# Respaldo y restauración de la base de datos.
-# Uso: ./respaldo.sh                 crea un respaldo con fecha
-#      ./respaldo.sh listar          muestra los respaldos
-#      ./respaldo.sh restaurar ARCHIVO   restaura uno (ej. respaldos/contrataciones-2026-10-29_15-00.db)
+#!/usr/bin/env bash
+# Uso: ./respaldo.sh | ./respaldo.sh listar | ./respaldo.sh restaurar ARCHIVO
+set -euo pipefail
+cd "$(dirname "$0")"
+if command -v podman >/dev/null; then RT=podman; else RT=docker; fi
+C="$RT compose"
+mkdir -p respaldos
 
-DIR="$(cd "$(dirname "$0")" && pwd)/respaldos"
-MANTENER=14   # cantidad de respaldos que se conservan
-mkdir -p "$DIR"
-
-case "$1" in
-  listar)
-    ls -lh "$DIR"
-    ;;
-
+case "${1:-crear}" in
+  crear)
+    A="respaldos/contrataciones-$(date +%Y%m%d-%H%M%S).db"
+    $C exec -T backend rm -f /tmp/r.db
+    $C exec -T backend python -c "import sqlite3; sqlite3.connect('/data/contrataciones.db').execute(\"VACUUM INTO '/tmp/r.db'\")"
+    $C exec -T backend cat /tmp/r.db > "$A"
+    $C exec -T backend rm -f /tmp/r.db
+    ls -1t respaldos/*.db | tail -n +15 | xargs -r rm --
+    echo "Respaldo creado: $A"
+    # Copia fuera del equipo si defines RESPALDO_DESTINO en .env
+    DEST=$(grep -E '^RESPALDO_DESTINO=' .env 2>/dev/null | cut -d= -f2- || true)
+    if [ -n "$DEST" ]; then rsync -a "$A" "$DEST" && echo "Copiado a $DEST"; fi ;;
+  listar) ls -lh respaldos ;;
   restaurar)
-    ARCHIVO="$2"
-    if [ ! -f "$ARCHIVO" ]; then
-      echo "Indica un archivo válido. Usa ./respaldo.sh listar"
-      exit 1
-    fi
-    read -p "Esto reemplaza TODOS los datos actuales. ¿Continuar? (si/no) " R
-    [ "$R" = "si" ] || { echo "Cancelado."; exit 0; }
-    # Respaldo de seguridad antes de restaurar
-    "$0"
-    podman stop backend
-    podman cp "$ARCHIVO" backend:/data/contrataciones.db
-    podman start backend
-    echo "Restaurado desde $ARCHIVO"
-    ;;
-
-  *)
-    set -e
-    FECHA=$(date +%Y-%m-%d_%H-%M)
-    DESTINO="$DIR/contrataciones-$FECHA.db"
-    # .backup es el método seguro de SQLite (no corrompe aunque haya escrituras)
-    podman exec backend python3 -c "
-import sqlite3
-o = sqlite3.connect('/data/contrataciones.db')
-d = sqlite3.connect('/data/respaldo_tmp.db')
-o.backup(d); d.close(); o.close()
-"
-    podman cp backend:/data/respaldo_tmp.db "$DESTINO"
-    podman exec backend rm -f /data/respaldo_tmp.db
-    chmod 600 "$DESTINO"
-    echo "Respaldo creado: $DESTINO"
-    # Borra los más antiguos y deja los últimos $MANTENER
-    ls -1t "$DIR"/contrataciones-*.db | tail -n +$((MANTENER + 1)) | xargs -r rm -f
-    ;;
+    F="${2:?Indica el archivo, p. ej. respaldos/contrataciones-2026....db}"
+    read -rp "Esto reemplaza la base actual. ¿Continuar? (si/no) " r; [ "$r" = si ] || exit 1
+    $C stop backend
+    $RT run --rm -v contrataciones_datos:/data -v "$PWD/$F":/r.db:ro python:3.12-slim \
+      sh -c "cp /r.db /data/contrataciones.db && chown 10001 /data/contrataciones.db"
+    $C start backend && echo "Restaurado." ;;
+  *) echo "Uso: $0 [crear|listar|restaurar ARCHIVO]"; exit 1 ;;
 esac

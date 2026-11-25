@@ -1,49 +1,57 @@
 import os
-import sys
 import tempfile
+from pathlib import Path
+
+os.environ["SECRET_KEY"] = "clave-de-pruebas-0123456789"
+os.environ["DB_PATH"] = str(Path(tempfile.mkdtemp()) / "test.db")
+os.environ["ADMIN_USER"] = "admin"
+os.environ["ADMIN_PASSWORD"] = "ClaveAdmin123"
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlmodel import SQLModel
 
-# Base temporal y secretos de prueba: se definen ANTES de importar la app
-_tmp = tempfile.mkdtemp()
-os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
-os.environ["SECRET_KEY"] = "clave-solo-para-pruebas"
-os.environ["ADMIN_USER"] = "admin"
-os.environ["ADMIN_PASSWORD"] = "Admin12345"
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-import main  # noqa: E402
+from app.db import engine
+from app.main import INTENTOS, app, inicializar
 
 
-def cabecera(client, usuario, clave):
-    r = client.post("/login", json={"username": usuario, "password": clave})
+@pytest.fixture()
+def c() -> TestClient:
+    SQLModel.metadata.drop_all(engine)
+    INTENTOS.clear()
+    inicializar()
+    return TestClient(app)
+
+
+def entrar(c: TestClient, usuario: str = "admin", clave: str = "ClaveAdmin123") -> dict[str, str]:
+    r = c.post("/api/login", json={"usuario": usuario, "clave": clave})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
-@pytest.fixture(scope="session")
-def client():
-    return TestClient(main.app)
+def con_rol(c: TestClient, rol: str) -> dict[str, str]:
+    h = entrar(c)
+    r = c.post(
+        "/api/usuarios",
+        headers=h,
+        json={"usuario": rol, "nombre": rol.title(), "rol": rol, "clave": "Clave12345x"},
+    )
+    assert r.status_code == 201, r.text
+    return entrar(c, rol, "Clave12345x")
 
 
-@pytest.fixture(scope="session")
-def admin(client):
-    return cabecera(client, "admin", "Admin12345")
-
-
-@pytest.fixture(scope="session")
-def reclutador(client, admin):
-    r = client.post("/usuarios", headers=admin,
-                    json={"username": "rec", "password": "Reclutador1", "rol": "reclutador"})
-    assert r.status_code == 200, r.text
-    return cabecera(client, "rec", "Reclutador1")
-
-
-@pytest.fixture(scope="session")
-def auditor(client, admin):
-    r = client.post("/usuarios", headers=admin,
-                    json={"username": "aud", "password": "Auditor123", "rol": "auditor"})
-    assert r.status_code == 200, r.text
-    return cabecera(client, "aud", "Auditor123")
+def candidato(
+    c: TestClient, h: dict[str, str], email: str = "ana@ejemplo.mx", **extra: object
+) -> dict:
+    vid = c.post("/api/vacantes", headers=h, json={"titulo": "Dev"}).json()["id"]
+    cuerpo = {
+        "nombre": "Ana Torres",
+        "email": email,
+        "telefono": "5512345678",
+        "vacante_id": vid,
+        "aviso_privacidad": True,
+        **extra,
+    }
+    r = c.post("/api/candidatos", headers=h, json=cuerpo)
+    assert r.status_code == 201, r.text
+    return r.json()

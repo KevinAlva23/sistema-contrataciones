@@ -1,59 +1,24 @@
-#!/bin/bash
-# Construye y levanta el sistema con contenedores separados.
-# Uso: ./iniciar.sh          (reconstruye todo)
-#      ./iniciar.sh detener  (apaga los contenedores)
+#!/usr/bin/env bash
+# Uso: ./iniciar.sh [iniciar|detener|logs]
+set -euo pipefail
+cd "$(dirname "$0")"
+if command -v podman >/dev/null; then C="podman compose"; else C="docker compose"; fi
 
-RED=red-contrataciones
-VOLUMEN=datos
-
-if [ "$1" = "detener" ]; then
-  podman rm -f frontend backend
-  echo "Contenedores detenidos. Los datos se conservan en el volumen."
-  exit 0
-fi
-
-# Si no existe .env, lo crea con una clave secreta aleatoria
 if [ ! -f .env ]; then
-  echo "No existe el archivo .env. Vamos a crearlo."
-  read -r -s -p "Contraseña del administrador (mín. 10, con mayúscula, minúscula y número): " CLAVE; echo
-  if [ ${#CLAVE} -lt 10 ] || ! [[ "$CLAVE" =~ [A-Z] ]] || ! [[ "$CLAVE" =~ [a-z] ]] || ! [[ "$CLAVE" =~ [0-9] ]]; then
-    echo "La contraseña no cumple los requisitos."; exit 1
-  fi
-  printf 'SECRET_KEY=%s\nADMIN_USER=admin\nADMIN_PASSWORD=%s\n' "$(openssl rand -hex 32)" "$CLAVE" > .env
+  read -rsp "Contraseña del administrador (10+ caracteres, mayúsculas, minúsculas y números): " pw; echo
+  cat > .env <<ENV
+SECRET_KEY=$(openssl rand -hex 32)
+ADMIN_USER=admin
+ADMIN_PASSWORD=$pw
+DEMO_DATA=0
+RESPALDO_DESTINO=
+ENV
   chmod 600 .env
-  echo ".env creado."
 fi
 
-# Si algo falla, el script se detiene
-set -e
-
-echo "1/5 Construyendo imágenes..."
-podman build -q -t contrataciones_backend ./backend
-podman build -q -t contrataciones_frontend ./frontend
-
-echo "2/5 Preparando red y volumen..."
-podman network exists $RED || podman network create $RED
-podman volume exists $VOLUMEN || podman volume create $VOLUMEN
-
-echo "3/5 Limpiando contenedores anteriores..."
-podman rm -f frontend backend 2>/dev/null || true
-
-echo "4/5 Levantando backend..."
-podman run -d --name backend --env-file .env --network $RED -v $VOLUMEN:/data --read-only --tmpfs /tmp --cap-drop=ALL --security-opt no-new-privileges --memory 512m --pids-limit 200 --restart unless-stopped localhost/contrataciones_backend
-
-# Espera hasta 15 segundos a que el backend arranque
-for i in $(seq 1 15); do
-  if podman logs backend 2>&1 | grep -q "Application startup complete"; then
-    break
-  fi
-  if [ "$(podman inspect -f '{{.State.Running}}' backend)" != "true" ]; then
-    echo "ERROR: el backend se cayó. Revisa: podman logs backend"
-    exit 1
-  fi
-  sleep 1
-done
-
-echo "5/5 Levantando frontend..."
-podman run -d --name frontend --network $RED -p 8080:80 --read-only --tmpfs /tmp --tmpfs /var/cache/nginx --tmpfs /var/run --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID --cap-add=NET_BIND_SERVICE --security-opt no-new-privileges --memory 256m --pids-limit 200 --restart unless-stopped localhost/contrataciones_frontend
-
-echo "Listo. Abre http://localhost:8080"
+case "${1:-iniciar}" in
+  iniciar) $C up -d --build && echo "Listo: http://localhost:8080  (API: /api/docs)" ;;
+  detener) $C down ;;
+  logs) $C logs -f ;;
+  *) echo "Uso: $0 [iniciar|detener|logs]"; exit 1 ;;
+esac
