@@ -2,7 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 
-os.environ["SECRET_KEY"] = "clave-de-pruebas-0123456789"
+os.environ["SECRET_KEY"] = "clave-de-pruebas-de-al-menos-32-caracteres-ok"
 os.environ["DB_PATH"] = str(Path(tempfile.mkdtemp()) / "test.db")
 os.environ["ADMIN_USER"] = "admin"
 os.environ["ADMIN_PASSWORD"] = "ClaveAdmin123"

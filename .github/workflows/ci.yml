@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
     env:
-      SECRET_KEY: clave-de-integracion-continua-0123
+      SECRET_KEY: clave-de-integracion-continua-de-al-menos-32-caracteres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
