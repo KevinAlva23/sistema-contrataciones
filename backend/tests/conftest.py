@@ -1,8 +1,8 @@
 import os
+import secrets
 import tempfile
 from pathlib import Path
 
-import secrets
 os.environ["SECRET_KEY"] = secrets.token_hex(32)
 os.environ["DB_PATH"] = str(Path(tempfile.mkdtemp()) / "test.db")
 os.environ["ADMIN_USER"] = "admin"
