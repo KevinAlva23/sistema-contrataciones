@@ -1,208 +1,145 @@
-import itertools
+import io
 
-_n = itertools.count(1)
-
-
-def candidato(**extra):
-    """Candidato válido con email único en cada llamada."""
-    n = next(_n)
-    datos = {"nombre": f"Prueba {n}", "email": f"prueba{n}@mail.com",
-             "puesto": "Dev", "telefono": "5512345678"}
-    datos.update(extra)
-    return datos
+from conftest import candidato, con_rol, entrar
 
 
-# ---------- Autenticación ----------
-def test_sin_token_es_rechazado(client):
-    assert client.get("/candidatos").status_code == 401
+def test_salud(c):
+    assert c.get("/api/salud").json() == {"estado": "ok"}
 
 
-def test_login_correcto(client):
-    r = client.post("/login", json={"username": "admin", "password": "Admin12345"})
-    assert r.status_code == 200
-    assert r.json()["rol"] == "admin"
+def test_requiere_token(c):
+    assert c.get("/api/candidatos").status_code == 401
 
 
-def test_login_con_clave_incorrecta(client):
-    r = client.post("/login", json={"username": "admin", "password": "mala-clave"})
-    assert r.status_code == 401
-
-
-def test_bloqueo_tras_cinco_intentos(client):
+def test_bloqueo_tras_cinco_fallos(c):
     for _ in range(5):
-        assert client.post("/login", json={"username": "fantasma", "password": "x"}).status_code == 401
-    assert client.post("/login", json={"username": "fantasma", "password": "x"}).status_code == 429
+        assert c.post("/api/login", json={"usuario": "admin", "clave": "mala"}).status_code == 401
+    r = c.post("/api/login", json={"usuario": "admin", "clave": "ClaveAdmin123"})
+    assert r.status_code == 429
 
 
-# ---------- Validaciones ----------
-def test_telefono_debe_tener_10_digitos(client, admin):
-    r = client.post("/candidatos", headers=admin, json=candidato(telefono="123"))
+def test_roles(c):
+    adm = entrar(c)
+    rec, aud = con_rol(c, "reclutador"), con_rol(c, "auditor")
+    cand = candidato(c, rec)
+    assert c.get("/api/bitacora", headers=rec).status_code == 403
+    assert c.get("/api/bitacora", headers=aud).status_code == 200
+    assert c.post("/api/candidatos", headers=aud, json={}).status_code == 403
+    assert c.delete(f"/api/candidatos/{cand['id']}", headers=rec).status_code == 403
+    assert c.get("/api/usuarios", headers=rec).status_code == 403
+    assert c.get("/api/candidatos/exportar", headers=aud).status_code == 200
+    assert c.delete(f"/api/candidatos/{cand['id']}", headers=adm).status_code == 204
+
+
+def test_validaciones(c):
+    h = entrar(c)
+    base = candidato(c, h)
+    vid = base["vacante_id"]
+    ok = {
+        "nombre": "X",
+        "email": "x@ej.mx",
+        "telefono": "5512345678",
+        "vacante_id": vid,
+        "aviso_privacidad": True,
+    }
+    assert c.post("/api/candidatos", headers=h, json={**ok, "telefono": "123"}).status_code == 422
+    assert c.post("/api/candidatos", headers=h, json={**ok, "email": "malo"}).status_code == 422
+    assert (
+        c.post("/api/candidatos", headers=h, json={**ok, "aviso_privacidad": False}).status_code
+        == 422
+    )
+    assert (
+        c.post("/api/candidatos", headers=h, json={**ok, "email": "ANA@ejemplo.mx"}).status_code
+        == 409
+    )
+
+
+def test_cliente_no_controla_estado(c):
+    h = entrar(c)
+    assert candidato(c, h, estado="contratado", id=99)["estado"] == "nuevo"
+
+
+def test_flujo_completo_con_aprobacion(c):
+    adm = entrar(c)
+    rec = con_rol(c, "reclutador")
+    cid = candidato(c, rec)["id"]
+    def ir(est, **k):
+        return c.post(
+            f"/api/candidatos/{cid}/avanzar", headers=rec, json={"estado": est, **k}
+        )
+
+    assert ir("oferta").status_code == 409
+    for est in ("revision", "entrevista", "tecnica", "oferta"):
+        assert ir(est).status_code == 200
+    assert ir("contratado").status_code == 409
+    assert c.post(f"/api/candidatos/{cid}/solicitar-oferta", headers=rec).status_code == 409
+    assert (
+        c.patch(f"/api/candidatos/{cid}", headers=rec, json={"salario": 40000}).status_code == 200
+    )
+    assert c.post(f"/api/candidatos/{cid}/solicitar-oferta", headers=rec).status_code == 200
+    assert c.post(f"/api/candidatos/{cid}/aprobar-oferta", headers=rec).status_code == 403
+    assert c.post(f"/api/candidatos/{cid}/aprobar-oferta", headers=adm).status_code == 200
+    assert ir("contratado").json()["estado"] == "contratado"
+    assert len(c.get(f"/api/candidatos/{cid}/historial", headers=rec).json()) >= 7
+
+
+def test_rechazo_requiere_motivo(c):
+    h = entrar(c)
+    cid = candidato(c, h)["id"]
+    url = f"/api/candidatos/{cid}/avanzar"
+    assert c.post(url, headers=h, json={"estado": "rechazado"}).status_code == 422
+    r = c.post(url, headers=h, json={"estado": "rechazado", "motivo": "Sin disponibilidad"})
+    assert r.json()["motivo_rechazo"] == "Sin disponibilidad"
+    assert c.post(url, headers=h, json={"estado": "revision"}).status_code == 409
+
+
+def test_exportar_neutraliza_formulas(c):
+    h = entrar(c)
+    candidato(c, h, nombre="=CMD()")
+    assert "'=CMD()" in c.get("/api/candidatos/exportar", headers=h).text
+
+
+def test_cambiar_clave_revoca_sesion_anterior(c):
+    h = entrar(c)
+    r = c.post(
+        "/api/cambiar-clave", headers=h, json={"actual": "ClaveAdmin123", "nueva": "NuevaClave99x"}
+    )
+    assert r.status_code == 200
+    assert c.get("/api/yo", headers=h).status_code == 401
+    nuevo = {"Authorization": f"Bearer {r.json()['token']}"}
+    assert c.get("/api/yo", headers=nuevo).status_code == 200
+
+
+def test_politica_de_clave(c):
+    h = entrar(c)
+    r = c.post(
+        "/api/usuarios",
+        headers=h,
+        json={"usuario": "u1", "nombre": "U", "rol": "auditor", "clave": "corta"},
+    )
     assert r.status_code == 422
 
 
-def test_email_duplicado(client, admin):
-    c = candidato()
-    assert client.post("/candidatos", headers=admin, json=c).status_code == 200
-    r = client.post("/candidatos", headers=admin, json=candidato(email=c["email"]))
-    assert r.status_code == 409
+def test_ultimo_admin_protegido(c):
+    h = entrar(c)
+    uid = c.get("/api/yo", headers=h).json()["id"]
+    assert c.patch(f"/api/usuarios/{uid}", headers=h, json={"rol": "auditor"}).status_code == 409
+    assert c.delete(f"/api/usuarios/{uid}", headers=h).status_code == 409
 
 
-def test_estado_invalido(client, admin):
-    nuevo = client.post("/candidatos", headers=admin, json=candidato()).json()
-    r = client.patch(f"/candidatos/{nuevo['id']}?estado=inventado", headers=admin)
-    assert r.status_code == 400
-
-
-# ---------- Roles ----------
-def test_reclutador_crea_y_cambia_estado(client, reclutador):
-    nuevo = client.post("/candidatos", headers=reclutador, json=candidato())
-    assert nuevo.status_code == 200
-    r = client.patch(f"/candidatos/{nuevo.json()['id']}?estado=contratado", headers=reclutador)
-    assert r.status_code == 200
-    assert r.json()["estado"] == "contratado"
-
-
-def test_reclutador_no_puede_eliminar(client, admin, reclutador):
-    nuevo = client.post("/candidatos", headers=admin, json=candidato()).json()
-    assert client.delete(f"/candidatos/{nuevo['id']}", headers=reclutador).status_code == 403
-    assert client.delete(f"/candidatos/{nuevo['id']}", headers=admin).status_code == 200
-
-
-def test_auditor_solo_lee(client, auditor):
-    assert client.get("/candidatos", headers=auditor).status_code == 200
-    assert client.post("/candidatos", headers=auditor, json=candidato()).status_code == 403
-    assert client.get("/usuarios", headers=auditor).status_code == 403
-
-
-def test_reclutador_no_ve_usuarios_ni_bitacora(client, reclutador):
-    assert client.get("/usuarios", headers=reclutador).status_code == 403
-    assert client.get("/bitacora", headers=reclutador).status_code == 403
-
-
-# ---------- Usuarios ----------
-def test_admin_no_puede_quitarse_sus_permisos(client, admin):
-    usuarios = client.get("/usuarios", headers=admin).json()
-    yo = next(u for u in usuarios if u["username"] == "admin")
-    r = client.patch(f"/usuarios/{yo['id']}", headers=admin, json={"rol": "auditor"})
-    assert r.status_code == 400
-
-
-def test_contrasena_corta_es_rechazada(client, admin):
-    r = client.post("/usuarios", headers=admin,
-                    json={"username": "corta", "password": "123", "rol": "auditor"})
-    assert r.status_code == 422
-
-
-# ---------- Bitácora ----------
-def test_bitacora_registra_acciones(client, admin, auditor):
-    client.post("/candidatos", headers=admin, json=candidato(nombre="Registrado en bitacora"))
-    r = client.get("/bitacora", headers=auditor)
-    assert r.status_code == 200
-    acciones = {b["accion"] for b in r.json()}
-    assert {"login", "candidato_creado"} <= acciones
-
-
-# ---------- Cambio de contraseña y política ----------
-def test_politica_rechaza_clave_debil(client, admin):
-    r = client.post("/usuarios", headers=admin,
-                    json={"username": "debil", "password": "abcdefgh", "rol": "auditor"})
-    assert r.status_code == 422
-
-
-def test_cambiar_clave_propia(client, admin):
-    client.post("/usuarios", headers=admin,
-                json={"username": "cambia", "password": "ClaveVieja123", "rol": "auditor"})
-    r = client.post("/login", json={"username": "cambia", "password": "ClaveVieja123"})
-    h = {"Authorization": f"Bearer {r.json()['token']}"}
-
-    # La actual incorrecta se rechaza
-    assert client.post("/cambiar-clave", headers=h,
-                       json={"actual": "otra", "nueva": "ClaveNueva456"}).status_code == 400
-    # Una nueva débil se rechaza
-    assert client.post("/cambiar-clave", headers=h,
-                       json={"actual": "ClaveVieja123", "nueva": "corta"}).status_code == 422
-    # Cambio correcto
-    assert client.post("/cambiar-clave", headers=h,
-                       json={"actual": "ClaveVieja123", "nueva": "ClaveNueva456"}).status_code == 200
-    # La vieja ya no sirve y la nueva sí
-    assert client.post("/login", json={"username": "cambia", "password": "ClaveVieja123"}).status_code == 401
-    assert client.post("/login", json={"username": "cambia", "password": "ClaveNueva456"}).status_code == 200
-
-
-# ---------- Exportación ----------
-def test_exportar_csv_solo_admin_y_auditor(client, admin, auditor, reclutador):
-    client.post("/candidatos", headers=admin, json=candidato(nombre="=CMD()"))
-    r = client.get("/candidatos/exportar", headers=auditor)
-    assert r.status_code == 200
-    assert "text/csv" in r.headers["content-type"]
-    assert "'=CMD()" in r.text          # la fórmula queda neutralizada
-    assert client.get("/candidatos/exportar", headers=reclutador).status_code == 403
-    assert client.get("/candidatos/exportar").status_code == 401
-
-
-# ---------- Estadísticas ----------
-def test_estadisticas(client, admin, auditor, reclutador):
-    client.post("/candidatos", headers=admin, json=candidato())
-    r = client.get("/estadisticas", headers=auditor)
-    assert r.status_code == 200
-    d = r.json()
-    assert d["total"] >= 1
-    assert "por_estado" in d and "por_puesto" in d and "por_mes" in d
-    assert client.get("/estadisticas", headers=reclutador).status_code == 403
-
-
-# ---------- Estados nuevos y notas ----------
-def test_estados_nuevos_y_notas(client, admin):
-    nuevo = client.post("/candidatos", headers=admin, json=candidato()).json()
-    for e in ("en_entrevista", "oferta_enviada"):
-        r = client.patch(f"/candidatos/{nuevo['id']}?estado={e}", headers=admin)
-        assert r.status_code == 200 and r.json()["estado"] == e
-    datos = {**candidato(), "notas": "Buena entrevista"}
-    datos["email"] = nuevo["email"]
-    r = client.put(f"/candidatos/{nuevo['id']}", headers=admin, json=datos)
-    assert r.status_code == 200 and r.json()["notas"] == "Buena entrevista"
-
-
-def test_importar_csv(client, admin, reclutador):
-    csv_ok = "nombre,email,puesto,telefono\nImp Uno,imp1@mail.com,Dev,5511111111\nMalo,malo@mail.com,Dev,123\n"
-    r = client.post("/candidatos/importar", headers=admin, json={"contenido": csv_ok})
-    assert r.status_code == 200
-    assert r.json()["creados"] == 1 and len(r.json()["errores"]) == 1
-    assert client.post("/candidatos/importar", headers=reclutador, json={"contenido": csv_ok}).status_code == 403
-
-
-# ---------- Endurecimiento ----------
-def test_email_con_formato_invalido(client, admin):
-    r = client.post("/candidatos", headers=admin, json=candidato(email="no-es-un-correo"))
-    assert r.status_code == 422
-
-
-def test_campos_vacios_son_rechazados(client, admin):
-    r = client.post("/candidatos", headers=admin, json=candidato(nombre="   "))
-    assert r.status_code == 422
-
-
-def test_email_duplicado_ignora_mayusculas(client, admin):
-    c = candidato()
-    assert client.post("/candidatos", headers=admin, json=c).status_code == 200
-    r = client.post("/candidatos", headers=admin, json=candidato(email=c["email"].upper()))
-    assert r.status_code == 409
-
-
-def test_cliente_no_puede_fijar_estado_ni_id(client, admin):
-    r = client.post("/candidatos", headers=admin,
-                    json=candidato(estado="contratado", id=9999, creado="2000-01-01"))
-    assert r.status_code == 200
-    d = r.json()
-    assert d["estado"] == "pendiente" and d["id"] != 9999
-    assert not d["creado"].startswith("2000")
-
-
-def test_editar_valida_telefono(client, admin):
-    nuevo = client.post("/candidatos", headers=admin, json=candidato()).json()
-    malo = {**candidato(), "email": nuevo["email"], "telefono": "abc"}
-    assert client.put(f"/candidatos/{nuevo['id']}", headers=admin, json=malo).status_code == 422
-
-
-def test_endpoint_de_salud(client):
-    assert client.get("/salud").json() == {"ok": True}
+def test_importar_csv(c):
+    h = entrar(c)
+    candidato(c, h)
+    csv_ = (
+        "nombre,email,telefono,vacante,aviso\n"
+        "Luis,luis@ej.mx,5511111111,Dev,si\n"
+        "Mal,mal@ej.mx,123,Dev,si\n"
+        "Dup,ana@ejemplo.mx,5522222222,Dev,si\n"
+    )
+    r = c.post(
+        "/api/candidatos/importar",
+        headers=h,
+        files={"archivo": ("c.csv", io.BytesIO(csv_.encode()), "text/csv")},
+    )
+    assert r.json()["importados"] == 1
+    assert [e["fila"] for e in r.json()["errores"]] == [3, 4]

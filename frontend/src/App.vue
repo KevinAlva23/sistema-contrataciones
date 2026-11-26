@@ -1,550 +1,90 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import Usuarios from './Usuarios.vue'
-import Toast from './Toast.vue'
-import { notify } from './toast.js'
-import Bitacora from './Bitacora.vue'
-import Estadisticas from './Estadisticas.vue'
-import MiCuenta from './MiCuenta.vue'
+import { computed, onMounted, ref } from "vue";
+import { api, ROLES, aviso, puede, salir, store } from "./store";
+import Icono from "./components/Icono.vue";
+import Avatar from "./components/Avatar.vue";
+import Login from "./views/Login.vue";
+import Tablero from "./views/Tablero.vue";
+import Vacantes from "./views/Vacantes.vue";
+import Bitacora from "./views/Bitacora.vue";
+import Reportes from "./views/Reportes.vue";
+import Usuarios from "./views/Usuarios.vue";
 
-const token = ref(localStorage.getItem('token') || '')
-const usuario = ref(localStorage.getItem('usuario') || '')
-const rol = ref(localStorage.getItem('rol') || '')
-const loginForm = ref({ username: '', password: '', codigo: '' })
-const pideCodigo = ref(false)
-const errorLogin = ref('')
-const vista = ref('candidatos')
+const vista = ref("tablero");
+const listo = ref(false);
+const tema = ref(localStorage.getItem("tema") || "auto");
 
-const candidatos = ref([])
-const filtro = ref('todos')
-const busqueda = ref('')
-const form = ref({ nombre: '', email: '', puesto: '', telefono: '', notas: '' })
-const editandoId = ref(null)
-const error = ref('')
-const lista = ref(localStorage.getItem('lista') || 'tabla')
-function setLista(v) { lista.value = v; localStorage.setItem('lista', v) }
-const ESTADOS = ['pendiente', 'en_entrevista', 'oferta_enviada', 'contratado', 'rechazado']
-const ETIQUETAS = { pendiente: 'Pendiente', en_entrevista: 'En entrevista', oferta_enviada: 'Oferta enviada', contratado: 'Contratado', rechazado: 'Rechazado' }
-const etiqueta = (e) => ETIQUETAS[e] || e
-const arrastrando = ref(null)
-const sobre = ref('')
-const porEstado = (e) => filtrados.value.filter(c => c.estado === e)
-function soltar(e) {
-  const c = arrastrando.value
-  arrastrando.value = null; sobre.value = ''
-  if (c && c.estado !== e && puedeEditar.value) estado(c.id, e)
-}
-const detalle = ref(null)
-const ayuda = ref(false)
-const historialDe = ref([])
-const abrir = async (c) => {
-  detalle.value = c
-  historialDe.value = []
-  if (!puedeBitacora.value) return
-  try {
-    const r = await api(`/api/candidatos/${c.id}/historial`)
-    if (r.ok) historialDe.value = await r.json()
-  } catch (e) {}
-}
-const cerrar = () => { detalle.value = null }
-const diasDe = (c) => c.creado ? Math.floor((Date.now() - new Date(c.creado).getTime()) / 86400000) : null
+const MENU = [
+  { id: "tablero", t: "Tablero", i: "tablero", ok: () => true },
+  { id: "vacantes", t: "Vacantes", i: "vacantes", ok: () => true },
+  { id: "reportes", t: "Reportes", i: "reportes", ok: () => puede("aud") },
+  { id: "bitacora", t: "Bitácora", i: "bitacora", ok: () => puede("aud") },
+  { id: "usuarios", t: "Usuarios", i: "usuarios", ok: () => puede("usuarios") },
+];
+const menu = computed(() => MENU.filter((m) => m.ok()));
+const COMP = { tablero: Tablero, vacantes: Vacantes, reportes: Reportes, bitacora: Bitacora, usuarios: Usuarios };
 
-function atajos(e) {
-  if (e.key === 'Escape') { cerrar(); ayuda.value = false; return }
-  const campo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
-  if (campo || e.ctrlKey || e.metaKey || e.altKey || !token.value) return
-  if (e.key === '/') {
-    e.preventDefault()
-    vista.value = 'candidatos'
-    nextTick(() => document.querySelector('.buscador')?.focus())
-  } else if (e.key === 'n' && puedeEditar.value) {
-    e.preventDefault()
-    vista.value = 'candidatos'
-    nextTick(() => document.querySelector('.grid-form input')?.focus())
-  } else if (e.key === '?') {
-    ayuda.value = !ayuda.value
-  }
-}
-onMounted(() => window.addEventListener('keydown', atajos))
-onUnmounted(() => window.removeEventListener('keydown', atajos))
-
-const sistemaOscuro = () => window.matchMedia('(prefers-color-scheme: dark)').matches
-const tema = ref(localStorage.getItem('tema') || (sistemaOscuro() ? 'oscuro' : 'claro'))
 function aplicarTema() {
-  document.documentElement.dataset.tema = tema.value
+  if (tema.value === "auto") document.documentElement.removeAttribute("data-tema");
+  else document.documentElement.dataset.tema = tema.value;
 }
-function alternarTema() {
-  tema.value = tema.value === 'oscuro' ? 'claro' : 'oscuro'
-  localStorage.setItem('tema', tema.value)
-  aplicarTema()
+function cambiarTema() {
+  const oscuro = getComputedStyle(document.documentElement).colorScheme.includes("dark");
+  tema.value = oscuro ? "claro" : "oscuro";
+  localStorage.setItem("tema", tema.value);
+  aplicarTema();
 }
-onMounted(aplicarTema)
-const compacto = ref(localStorage.getItem('compacto') === '1')
-function alternarCompacto() {
-  compacto.value = !compacto.value
-  localStorage.setItem('compacto', compacto.value ? '1' : '0')
-  document.documentElement.classList.toggle('compacto', compacto.value)
-}
-onMounted(() => document.documentElement.classList.toggle('compacto', compacto.value))
 
-// Aviso 10 minutos antes de que caduque el token
-let avisoSesion = null
-function vigilarSesion() {
-  clearTimeout(avisoSesion)
+async function arrancar() {
   try {
-    const exp = JSON.parse(atob(token.value.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000
-    const falta = exp - Date.now() - 10 * 60 * 1000
-    if (falta > 0) avisoSesion = setTimeout(() => notify('Tu sesión caduca en 10 minutos', 'error'), falta)
-  } catch (e) {}
-}
-watch(token, () => { if (token.value) vigilarSesion() })
-onMounted(() => { if (token.value) vigilarSesion() })
-async function importar(ev) {
-  const f = ev.target.files[0]
-  ev.target.value = ''
-  if (!f) return
-  try {
-    const r = await api('/api/candidatos/importar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contenido: await f.text() })
-    })
-    const d = await r.json()
-    if (!r.ok) { notify(d.detail || 'No se pudo importar', 'error'); return }
-    notify(`Importados: ${d.creados}. Con error: ${d.errores.length}`)
-    if (d.errores.length) error.value = d.errores.join(' · ')
-    cargar()
-  } catch (e) { falla(e) }
-}
-const ini = (n) => n.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()
-const colores = ['#0b7a3e', '#2563eb', '#7c3aed', '#c2410c', '#0f766e', '#be185d', '#a16207']
-const colorDe = (n) => colores[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % colores.length]
-
-const puedeEditar = computed(() => ['admin', 'reclutador'].includes(rol.value))
-const puedeBorrar = computed(() => rol.value === 'admin')
-const puedeBitacora = computed(() => ['admin', 'auditor'].includes(rol.value))
-
-const total = computed(() => candidatos.value.length)
-const cuenta = (e) => candidatos.value.filter(c => c.estado === e).length
-
-const cargando = ref(true)
-function falla(e) {
-  if (e && e.message === 'sesion') return
-  notify('No se pudo conectar con el servidor', 'error')
-}
-
-async function api(url, opciones = {}) {
-  const r = await fetch(url, {
-    ...opciones,
-    headers: { ...(opciones.headers || {}), Authorization: `Bearer ${token.value}` }
-  })
-  if (r.status === 401) { salir(); throw new Error('sesion') }
-  return r
-}
-
-async function entrar() {
-  errorLogin.value = ''
-  const r = await fetch('/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(loginForm.value)
-  })
-  if (!r.ok) {
-    const d = await r.json()
-    if (d.detail === 'Se requiere el código de verificación') pideCodigo.value = true
-    errorLogin.value = d.detail || 'No se pudo iniciar sesión'
-    return
+    store.config = await api("/config");
+    if (store.token) store.usuario = await api("/yo");
+  } catch (e) {
+    aviso(e.message);
   }
-  const d = await r.json()
-  token.value = d.token
-  usuario.value = d.username
-  rol.value = d.rol
-  localStorage.setItem('token', d.token)
-  localStorage.setItem('usuario', d.username)
-  localStorage.setItem('rol', d.rol)
-  loginForm.value = { username: '', password: '', codigo: '' }
-  pideCodigo.value = false
-  vista.value = 'candidatos'
-  cargar()
+  listo.value = true;
 }
-
-function salir() {
-  token.value = ''; usuario.value = ''; rol.value = ''
-  candidatos.value = []
-  vista.value = 'candidatos'
-  for (const k of ['token', 'usuario', 'rol']) localStorage.removeItem(k)
+onMounted(() => {
+  aplicarTema();
+  arrancar();
+});
+async function entrado() {
+  vista.value = "tablero";
 }
-
-const filtrados = computed(() => {
-  const texto = busqueda.value.trim().toLowerCase()
-  return candidatos.value.filter(c => {
-    const okEstado = filtro.value === 'todos' || c.estado === filtro.value
-    const okTexto = !texto ||
-      c.nombre.toLowerCase().includes(texto) ||
-      c.email.toLowerCase().includes(texto) ||
-      c.puesto.toLowerCase().includes(texto)
-    return okEstado && okTexto
-  })
-})
-
-const orden = ref({ campo: 'id', asc: true })
-const pagina = ref(1)
-const porPagina = ref(10)
-
-function ordenar(campo) {
-  if (orden.value.campo === campo) orden.value.asc = !orden.value.asc
-  else orden.value = { campo, asc: true }
-  pagina.value = 1
-}
-const flecha = (campo) => orden.value.campo === campo ? (orden.value.asc ? '▲' : '▼') : ''
-const ariaOrden = (campo) =>
-  orden.value.campo !== campo ? 'none' : (orden.value.asc ? 'ascending' : 'descending')
-
-const ordenados = computed(() => {
-  const { campo, asc } = orden.value
-  const lista = [...filtrados.value]
-  lista.sort((a, b) => {
-    const x = a[campo], y = b[campo]
-    const r = typeof x === 'number'
-      ? x - y
-      : String(x ?? '').localeCompare(String(y ?? ''), 'es', { sensitivity: 'base' })
-    return asc ? r : -r
-  })
-  return lista
-})
-
-const totalPaginas = computed(() => Math.max(1, Math.ceil(filtrados.value.length / porPagina.value)))
-const visibles = computed(() => {
-  const ini = (Math.min(pagina.value, totalPaginas.value) - 1) * porPagina.value
-  return ordenados.value.slice(ini, ini + porPagina.value)
-})
-
-// Al buscar, filtrar o cambiar el tamaño de página, vuelve a la primera
-watch([busqueda, filtro, porPagina], () => { pagina.value = 1 })
-
-async function cargar() {
-  if (!token.value) return
-  try {
-    const r = await api('/api/candidatos')
-    candidatos.value = await r.json()
-  } catch (e) { falla(e) } finally { cargando.value = false }
-}
-
-async function guardar() {
-  const editando = editandoId.value !== null
-  const url = editando ? `/api/candidatos/${editandoId.value}` : '/api/candidatos'
-  try {
-    const r = await api(url, {
-      method: editando ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
-    })
-    if (!r.ok) {
-      const d = await r.json()
-      error.value = typeof d.detail === 'string' ? d.detail : 'Datos inválidos'
-      return
-    }
-    error.value = ''
-    notify(editando ? 'Cambios guardados' : 'Candidato agregado')
-    cancelar()
-    cargar()
-  } catch (e) { falla(e) }
-}
-
-function editar(c) {
-  form.value = { nombre: c.nombre, email: c.email, puesto: c.puesto, telefono: c.telefono, notas: c.notas || '' }
-  editandoId.value = c.id
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function cancelar() {
-  form.value = { nombre: '', email: '', puesto: '', telefono: '', notas: '' }
-  editandoId.value = null
-}
-
-async function estado(id, e) {
-  try { await api(`/api/candidatos/${id}?estado=${e}`, { method: 'PATCH' }); notify('Estado actualizado'); cargar() } catch (x) { falla(x) }
-}
-
-async function borrar(c) {
-  if (!confirm(`¿Eliminar a ${c.nombre}? Esta acción no se puede deshacer.`)) return
-  try { await api(`/api/candidatos/${c.id}`, { method: 'DELETE' }); notify('Candidato eliminado'); cargar() } catch (x) { falla(x) }
-}
-
-async function exportar() {
-  try {
-    const r = await api('/api/candidatos/exportar')
-    if (!r.ok) { error.value = 'No se pudo exportar'; return }
-    const blob = await r.blob()
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'candidatos.csv'
-    a.click()
-    URL.revokeObjectURL(a.href)
-  } catch (e) { falla(e) }
-}
-
-onMounted(cargar)
 </script>
 
 <template>
-  <a class="saltar" href="#contenido">Saltar al contenido</a>
-  <header class="topbar">
-    <div class="topbar-in">
-      <div class="marca">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-        <div>
-          Sistema de Contrataciones
-          <small>Recursos Humanos</small>
-        </div>
-      </div>
-      <div class="sesion">
-        <button class="borde" :aria-pressed="tema === 'oscuro'" @click="alternarTema">{{ tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro' }}</button>
-        <template v-if="token">
-        <span class="usuario">{{ usuario }}</span>
-        <span class="rol" :class="rol">{{ rol }}</span>
-        <button class="borde" @click="salir">Cerrar sesión</button>
-        </template>
-       </div>
-    </div>
-  </header>
-
-  <main id="contenido" class="contenedor" tabindex="-1">
-
-    <!-- Login -->
-    <div v-if="!token" class="login-wrap">
-      <aside class="login-brand">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-        <h1>Gestiona tu proceso de contratación en un solo lugar</h1>
-        <p>Seguimiento de candidatos, permisos por rol y bitácora de auditoría.</p>
-        <ul>
-          <li>Tablero visual por etapas</li>
-          <li>Importación y exportación CSV</li>
-          <li>Registro de cada operación</li>
-        </ul>
-      </aside>
-      <form class="login" @submit.prevent="entrar">
-        <h2>Iniciar sesión</h2>
-        <p class="sub">Ingresa con tu cuenta asignada</p>
-        <input aria-label="Usuario" v-model="loginForm.username" placeholder="Usuario" required />
-        <input aria-label="Contraseña" v-model="loginForm.password" type="password" placeholder="Contraseña" required />
-        <button>Entrar</button>
-        <p v-if="errorLogin" class="error" role="alert">{{ errorLogin }}</p>
-      </form>
-    </div>
-
-    <template v-else>
-      <!-- Pestañas -->
-      <nav class="nav" aria-label="Secciones">
-        <button :class="{ activo: vista === 'candidatos' }" :aria-current="vista === 'candidatos' ? 'page' : undefined" @click="vista = 'candidatos'">Candidatos</button>
-        <button v-if="rol === 'admin'" :class="{ activo: vista === 'usuarios' }" :aria-current="vista === 'usuarios' ? 'page' : undefined" @click="vista = 'usuarios'">Usuarios</button>
-        <button v-if="puedeBitacora" :class="{ activo: vista === 'estadisticas' }" :aria-current="vista === 'estadisticas' ? 'page' : undefined" @click="vista = 'estadisticas'">Estadísticas</button>
-        <button v-if="puedeBitacora" :class="{ activo: vista === 'bitacora' }" :aria-current="vista === 'bitacora' ? 'page' : undefined" @click="vista = 'bitacora'">Bitácora</button>
-        <button :class="{ activo: vista === 'cuenta' }" :aria-current="vista === 'cuenta' ? 'page' : undefined" @click="vista = 'cuenta'">Mi cuenta</button>
+  <div v-if="!listo" class="carga">Cargando…</div>
+  <Login v-else-if="!store.usuario" @entrar="entrado" />
+  <div v-else class="app">
+    <aside class="lateral">
+      <div class="marca"><span class="punto" /> Talento</div>
+      <nav aria-label="Secciones">
+        <button
+          v-for="m in menu"
+          :key="m.id"
+          class="nav"
+          :aria-current="vista === m.id"
+          @click="vista = m.id"
+        >
+          <Icono :n="m.i" /><span>{{ m.t }}</span>
+        </button>
       </nav>
-
-      <!-- Vista: candidatos -->
-      <template v-if="vista === 'candidatos'">
-        <section class="stats">
-          <div class="stat">
-            <div class="num">{{ total }}</div>
-            <div class="lbl">Total de candidatos</div>
+      <div class="pie">
+        <button class="nav" aria-label="Cambiar tema" @click="cambiarTema"><Icono n="luna" /><span>Tema</span></button>
+        <div class="yo">
+          <Avatar :nombre="store.usuario.nombre" />
+          <div>
+            <b>{{ store.usuario.nombre }}</b>
+            <small>{{ ROLES[store.usuario.rol] }}</small>
           </div>
-          <div class="stat pend">
-            <div class="num">{{ cuenta('pendiente') }}</div>
-            <div class="lbl">Pendientes</div>
-          </div>
-          <div class="stat cont">
-            <div class="num">{{ cuenta('contratado') }}</div>
-            <div class="lbl">Contratados</div>
-          </div>
-          <div class="stat rech">
-            <div class="num">{{ cuenta('rechazado') }}</div>
-            <div class="lbl">Rechazados</div>
-          </div>
-        </section>
-
-        <section v-if="puedeEditar" class="panel">
-          <h2 class="panel-titulo">
-            {{ editandoId !== null ? 'Editar candidato' : 'Nuevo candidato' }}
-          </h2>
-          <form class="panel-cuerpo" @submit.prevent="guardar">
-            <div class="grid-form">
-              <input aria-label="Nombre" v-model="form.nombre" placeholder="Nombre" required />
-              <input aria-label="Email" v-model="form.email" type="email" placeholder="Email" required />
-              <input aria-label="Puesto" v-model="form.puesto" placeholder="Puesto" required />
-              <input aria-label="Teléfono (10 dígitos)" v-model="form.telefono" placeholder="Teléfono (10 dígitos)" required pattern="[0-9]{10}" title="Escribe 10 números" />
-            </div>
-            <textarea v-if="editandoId !== null" v-model="form.notas" aria-label="Notas" placeholder="Notas de entrevista o seguimiento" rows="3" style="width:100%;margin-top:10px"></textarea>
-            <div class="acciones-form">
-              <button>{{ editandoId !== null ? 'Guardar cambios' : 'Agregar' }}</button>
-              <button v-if="editandoId !== null" type="button" class="gris" @click="cancelar">Cancelar</button>
-            </div>
-            <p v-if="error" class="error" role="alert">{{ error }}</p>
-          </form>
-        </section>
-
-        <section class="panel">
-          <h2 class="panel-titulo">Candidatos</h2>
-          <div class="toolbar">
-            <input aria-label="Buscar por nombre, email o puesto" v-model="busqueda" class="buscador" placeholder="Buscar por nombre, email o puesto" />
-            <select v-model="filtro" aria-label="Filtrar por estado">
-              <option value="todos">Todos los estados</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="en_entrevista">En entrevista</option>
-              <option value="oferta_enviada">Oferta enviada</option>
-              <option value="contratado">Contratado</option>
-              <option value="rechazado">Rechazado</option>
-            </select>
-            <span class="cuenta">{{ filtrados.length }} resultado(s)</span>
-            <span class="vista-botones" role="group" aria-label="Tipo de vista">
-              <button :aria-pressed="compacto" @click="alternarCompacto">Compacto</button>
-              <button :aria-pressed="lista === 'tabla'" @click="setLista('tabla')">Tabla</button>
-              <button :aria-pressed="lista === 'tarjetas'" @click="setLista('tarjetas')">Tarjetas</button>
-              <button :aria-pressed="lista === 'kanban'" @click="setLista('kanban')">Tablero</button>
-            </span>
-            <button v-if="puedeBitacora" class="gris" @click="exportar">Exportar CSV</button>
-            <label v-if="rol === 'admin'" class="gris boton-archivo">Importar CSV
-              <input type="file" accept=".csv,text/csv" class="solo-lector" @change="importar" aria-label="Importar candidatos desde CSV" />
-            </label>
-          </div>
-          <div v-if="lista === 'kanban'" class="kanban">
-            <section v-for="e in ESTADOS" :key="e" class="col" :data-estado="e" :class="{ sobre: sobre === e }"
-              :aria-label="etiqueta(e)"
-              @dragover.prevent="sobre = e" @dragleave="sobre = ''" @drop.prevent="soltar(e)">
-              <h3>{{ etiqueta(e) }} <span class="num">{{ porEstado(e).length }}</span></h3>
-              <article v-for="c in porEstado(e)" :key="c.id" class="kcard"
-                :draggable="puedeEditar" @dragstart="arrastrando = c" @dragend="sobre = ''">
-                <b><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></b>
-                <small>{{ c.puesto }}</small>
-                <select v-if="puedeEditar" :aria-label="`Mover a ${c.nombre}`" :value="c.estado"
-                  @change="estado(c.id, $event.target.value)">
-                  <option v-for="x in ESTADOS" :key="x" :value="x">{{ etiqueta(x) }}</option>
-                </select>
-              </article>
-            </section>
-          </div>
-          <div v-else-if="lista === 'tarjetas'" class="tarjetas">
-            <p v-if="!filtrados.length" class="vacio">Sin resultados</p>
-            <article v-for="c in filtrados" :key="c.id" class="cand">
-              <header>
-                <span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span>
-                <h3><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></h3>
-              </header>
-              <span>{{ c.puesto }}</span>
-              <small>{{ c.email }} · {{ c.telefono }}</small>
-              <span class="estado" :class="c.estado">{{ etiqueta(c.estado) }}</span>
-              <div v-if="puedeEditar" class="acciones">
-                <button class="verde" :aria-label="`Contratar a ${c.nombre}`" @click="estado(c.id,'contratado')">Contratar</button>
-                <button class="rojo" :aria-label="`Rechazar a ${c.nombre}`" @click="estado(c.id,'rechazado')">Rechazar</button>
-                <button class="gris" :aria-label="`Editar a ${c.nombre}`" @click="editar(c)">Editar</button>
-                <button class="gris" :aria-label="`Pasar a entrevista a ${c.nombre}`" @click="estado(c.id,'en_entrevista')">Entrevista</button>
-                <button class="gris" :aria-label="`Enviar oferta a ${c.nombre}`" @click="estado(c.id,'oferta_enviada')">Oferta</button>
-                <button v-if="puedeBorrar" class="rojo" :aria-label="`Eliminar a ${c.nombre}`" @click="borrar(c)">Eliminar</button>
-              </div>
-            </article>
-          </div>
-          <div v-else class="tabla-scroll">
-            <table>
-              <caption class="solo-lector">Lista de candidatos</caption>
-              <thead>
-                <tr>
-                  <th :aria-sort="ariaOrden('nombre')"><button class="th-btn" @click="ordenar('nombre')">Nombre {{ flecha('nombre') }}</button></th><th :aria-sort="ariaOrden('email')"><button class="th-btn" @click="ordenar('email')">Email {{ flecha('email') }}</button></th><th :aria-sort="ariaOrden('puesto')"><button class="th-btn" @click="ordenar('puesto')">Puesto {{ flecha('puesto') }}</button></th>
-                  <th :aria-sort="ariaOrden('telefono')"><button class="th-btn" @click="ordenar('telefono')">Teléfono {{ flecha('telefono') }}</button></th><th :aria-sort="ariaOrden('estado')"><button class="th-btn" @click="ordenar('estado')">Estado {{ flecha('estado') }}</button></th><th v-if="puedeEditar">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="cargando">
-                  <td colspan="6"><div class="esqueleto"></div><div class="esqueleto"></div><div class="esqueleto"></div></td>
-                </tr>
-                <tr v-else-if="!filtrados.length">
-                  <td colspan="6" class="vacio">Sin resultados</td>
-                </tr>
-                <tr v-for="c in visibles" :key="c.id">
-                  <td><div class="celda-nombre"><span class="avatar" :style="{ background: colorDe(c.nombre) }" aria-hidden="true">{{ ini(c.nombre) }}</span><button class="nombre-link" @click="abrir(c)">{{ c.nombre }}</button></div></td>
-                  <td>{{ c.email }}</td>
-                  <td>{{ c.puesto }}</td>
-                  <td>{{ c.telefono }}</td>
-                  <td><span class="estado" :class="c.estado">{{ etiqueta(c.estado) }}</span></td>
-                  <td v-if="puedeEditar" class="acciones">
-                    <button class="gris" :aria-label="`Pasar a entrevista a ${c.nombre}`" @click="estado(c.id,'en_entrevista')">Entrevista</button>
-                    <button class="gris" :aria-label="`Enviar oferta a ${c.nombre}`" @click="estado(c.id,'oferta_enviada')">Oferta</button>
-                    <button class="verde" :aria-label="`Contratar a ${c.nombre}`" @click="estado(c.id,'contratado')">Contratar</button>
-                    <button class="rojo" :aria-label="`Rechazar a ${c.nombre}`" @click="estado(c.id,'rechazado')">Rechazar</button>
-                    <button class="gris" :aria-label="`Editar a ${c.nombre}`" @click="editar(c)">Editar</button>
-                    <button v-if="puedeBorrar" class="rojo" :aria-label="`Eliminar a ${c.nombre}`" @click="borrar(c)">Eliminar</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <nav class="paginacion" aria-label="Paginación">
-              <button class="gris" :disabled="pagina <= 1" @click="pagina--">Anterior</button>
-              <span>Página {{ Math.min(pagina, totalPaginas) }} de {{ totalPaginas }}</span>
-              <button class="gris" :disabled="pagina >= totalPaginas" @click="pagina++">Siguiente</button>
-              <select v-model.number="porPagina" aria-label="Filas por página">
-                <option :value="10">10 por página</option>
-                <option :value="25">25 por página</option>
-                <option :value="50">50 por página</option>
-              </select>
-            </nav>
-          </div>
-        </section>
-      </template>
-
-      <!-- Vista: usuarios (admin) -->
-      <Usuarios v-else-if="vista === 'usuarios' && rol === 'admin'" :token="token" :yo="usuario" @salir="salir" />
-
-      <!-- Vista: bitácora (admin y auditor) -->
-      <Estadisticas v-else-if="vista === 'estadisticas' && puedeBitacora" :token="token" @salir="salir" />
-
-      <Bitacora v-else-if="vista === 'bitacora' && puedeBitacora" :token="token" @salir="salir" />
-
-      <!-- Vista: mi cuenta (todos los roles) -->
-      <MiCuenta v-else-if="vista === 'cuenta'" :token="token" :usuario="usuario" @salir="salir" />
-    </template>
-  </main>
-
-  <template v-if="detalle">
-    <div class="fondo" @click="cerrar"></div>
-    <aside class="detalle-panel" role="dialog" aria-modal="true" aria-label="Detalle del candidato">
-      <h2>
-        <span class="avatar" :style="{ background: colorDe(detalle.nombre) }" aria-hidden="true">{{ ini(detalle.nombre) }}</span>
-        {{ detalle.nombre }}
-      </h2>
-      <span class="estado" :class="detalle.estado">{{ etiqueta(detalle.estado) }}</span>
-      <dl>
-        <dt>Puesto</dt><dd>{{ detalle.puesto }}</dd>
-        <dt>Email</dt><dd>{{ detalle.email }}</dd>
-        <dt>Teléfono</dt><dd>{{ detalle.telefono }}</dd>
-        <dt>Registro</dt><dd>{{ diasDe(detalle) === null ? 'Sin fecha' : 'Hace ' + diasDe(detalle) + ' días' }}</dd>
-      </dl>
-      <h3>Notas</h3>
-      <div class="notas-caja">{{ detalle.notas || 'Sin notas.' }}</div>
-      <template v-if="puedeBitacora">
-        <h3>Historial</h3>
-        <ul class="linea-tiempo">
-          <li v-if="!historialDe.length">Sin eventos registrados.</li>
-          <li v-for="(h, i) in historialDe" :key="i">
-            <b>{{ new Date(h.fecha).toLocaleString('es-MX') }}</b> · {{ h.usuario }}<br>{{ h.detalle }}
-          </li>
-        </ul>
-      </template>
-      <div v-if="puedeEditar" class="acciones">
-        <button class="gris" @click="estado(detalle.id,'en_entrevista'); cerrar()">Entrevista</button>
-        <button class="gris" @click="estado(detalle.id,'oferta_enviada'); cerrar()">Oferta</button>
-        <button class="verde" @click="estado(detalle.id,'contratado'); cerrar()">Contratar</button>
-        <button class="rojo" @click="estado(detalle.id,'rechazado'); cerrar()">Rechazar</button>
-        <button class="gris" @click="editar(detalle); cerrar()">Editar</button>
+        </div>
+        <button class="nav" @click="salir"><Icono n="salir" /><span>Salir</span></button>
       </div>
-      <button class="gris" @click="cerrar">Cerrar (Esc)</button>
     </aside>
-  </template>
-  <div v-if="ayuda" class="ayuda-atajos" role="status">
-    <div><kbd>/</kbd> Buscar</div>
-    <div><kbd>n</kbd> Nuevo candidato</div>
-    <div><kbd>Esc</kbd> Cerrar</div>
-    <div><kbd>?</kbd> Esta ayuda</div>
+    <main id="contenido" class="contenido">
+      <component :is="COMP[vista]" />
+    </main>
   </div>
-  <Toast />
-  <footer class="pie">Sistema de Contrataciones · Recursos Humanos</footer>
+  <div v-if="store.toast" class="toast" role="status">{{ store.toast }}</div>
 </template>
