@@ -388,8 +388,8 @@ async def importar(archivo: UploadFile, s: Sesion, u: Admin) -> dict[str, Any]:
                 or s.exec(select(Candidato).where(col(Candidato.email) == d.email)).first()
             ):
                 raise ValueError("Correo duplicado")
-        except (ValidationError, ValueError) as e:
-            errores.append({"fila": n, "motivo": str(e).splitlines()[0][:120]})
+        except (ValidationError, ValueError):
+            errores.append({"fila": n, "motivo": "Fila no válida"})
             continue
         vistos.add(d.email)
         c = Candidato(nombre=d.nombre, email=d.email, telefono=d.telefono, vacante_id=vid)
