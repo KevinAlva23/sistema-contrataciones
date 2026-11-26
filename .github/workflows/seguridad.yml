@@ -17,7 +17,7 @@ jobs:
       matrix:
         lenguaje: [python, javascript-typescript]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v3
         with: { languages: "${{ matrix.lenguaje }}" }
       - uses: github/codeql-action/analyze@v3
@@ -25,7 +25,7 @@ jobs:
   secretos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - uses: gitleaks/gitleaks-action@v2
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
@@ -33,7 +33,7 @@ jobs:
   trivy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Dependencias y configuración (Dockerfile, compose)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
